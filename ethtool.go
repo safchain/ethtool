@@ -83,6 +83,32 @@ type ethtoolStats struct {
 	data    [MAX_GSTRINGS]uint64
 }
 
+func DriverName(intf string) (string, error) {
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_IP)
+	if err != nil {
+		return "", err
+	}
+
+	drvinfo := ethtoolDrvInfo{
+		cmd: ETHTOOL_GDRVINFO,
+	}
+
+	var name [IFNAMSIZ]byte
+	copy(name[:], []byte(intf))
+
+	ifr := ifreq{
+		ifr_name: name,
+		ifr_data: uintptr(unsafe.Pointer(&drvinfo)),
+	}
+
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+	if ep != 0 {
+		return "", syscall.Errno(ep)
+	}
+
+	return string(bytes.Trim(drvinfo.driver[:], "\x00")), nil
+}
+
 // Stats retrieves stats of the given interface name
 func Stats(intf string) (map[string]uint64, error) {
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_IP)

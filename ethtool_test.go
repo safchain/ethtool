@@ -50,3 +50,23 @@ func TestStats(t *testing.T) {
 		t.Fatal("Unable to retrieve stats from any interface of this system.")
 	}
 }
+
+func TestDriverName(t *testing.T) {
+	intfs, err := net.Interfaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// we expected to have at least one success
+	success := false
+	for _, intf := range intfs {
+		_, err := DriverName(intf.Name)
+		if err == nil {
+			success = true
+		}
+	}
+
+	if !success {
+		t.Fatal("Unable to retrieve driver from any interface of this system.")
+	}
+}
