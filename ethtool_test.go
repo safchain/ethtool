@@ -22,7 +22,9 @@
 package ethtool
 
 import (
+    "fmt"
 	"net"
+    "os/exec"
 	"testing"
 )
 
@@ -60,7 +62,14 @@ func TestDriverName(t *testing.T) {
 	// we expected to have at least one success
 	success := false
 	for _, intf := range intfs {
-		_, err := DriverName(intf.Name)
+		drv, err := DriverName(intf.Name)
+        fmt.Println("-----------------")
+        fmt.Println(intf.Name)
+        fmt.Println(drv)
+        out, err := exec.Command("sudo", "ethtool", "-i", intf.Name).Output()
+        fmt.Println(err)
+        fmt.Println(string(out))
+
 		if err == nil {
 			success = true
 		}

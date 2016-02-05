@@ -89,22 +89,37 @@ func DriverName(intf string) (string, error) {
 		return "", err
 	}
 
-	drvinfo := ethtoolDrvInfo{
-		cmd: ETHTOOL_GDRVINFO,
-	}
+	fmt.Println("####################")
 
 	var name [IFNAMSIZ]byte
 	copy(name[:], []byte(intf))
 
+	drvinfo := ethtoolDrvInfo{
+		cmd:    ETHTOOL_GDRVINFO,
+		driver: [32]byte{70, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70},
+	}
+	ptr := uintptr(unsafe.Pointer(&drvinfo))
+
+	fmt.Println(drvinfo.cmd)
+	fmt.Println(string(drvinfo.driver[:]))
+
 	ifr := ifreq{
 		ifr_name: name,
-		ifr_data: uintptr(unsafe.Pointer(&drvinfo)),
+		ifr_data: ptr,
 	}
+
+	fmt.Println(ifr.ifr_data)
 
 	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return "", syscall.Errno(ep)
 	}
+
+	fmt.Println("---------------")
+	fmt.Println(drvinfo.cmd)
+	fmt.Println(ifr.ifr_data)
+
+	fmt.Println(string(drvinfo.driver[:]))
 
 	return string(bytes.Trim(drvinfo.driver[:], "\x00")), nil
 }
