@@ -96,6 +96,7 @@ func DriverName(intf string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer syscall.Close(fd)
 
 	drvinfo := ethtoolDrvInfo{
 		cmd: ETHTOOL_GDRVINFO,
@@ -123,6 +124,7 @@ func Stats(intf string) (map[string]uint64, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer syscall.Close(fd)
 
 	drvinfo := ethtoolDrvInfo{
 		cmd: ETHTOOL_GDRVINFO,
