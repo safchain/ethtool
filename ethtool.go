@@ -54,7 +54,7 @@ const (
 // MAX_GSTRINGS maximum number of stats entries that ethtool can
 // retrieve currently.
 const (
-	MAX_GSTRINGS = 100
+	MAX_GSTRINGS = 200
 )
 
 type ifreq struct {
