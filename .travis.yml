@@ -1,1 +1,16 @@
 language: go
+
+before_install:
+  - date
+  - ls -l
+  - pwd
+  - whoami
+  - uname -a
+  - env | grep TRAVIS
+  - echo "TRAVIS_BUILD_DIR $TRAVIS_BUILD_DIR"
+  - echo "TRAVIS_BRANCH    $TRAVIS_BRANCH"
+  - echo "HOME  $HOME"
+  - echo ls -la $HOME
+  - ls -la $HOME
+  - pwd
+
