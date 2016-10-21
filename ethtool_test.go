@@ -70,3 +70,23 @@ func TestDriverName(t *testing.T) {
 		t.Fatal("Unable to retrieve driver from any interface of this system.")
 	}
 }
+
+func TestBusInfo(t *testing.T) {
+	intfs, err := net.Interfaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// we expected to have at least one success
+	success := false
+	for _, intf := range intfs {
+		_, err := BusInfo(intf.Name)
+		if err == nil {
+			success = true
+		}
+	}
+
+	if !success {
+		t.Fatal("Unable to retrieve bus info from any interface of this system.")
+	}
+}

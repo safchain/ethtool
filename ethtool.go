@@ -92,9 +92,26 @@ type ethtoolStats struct {
 
 // DriverName returns the driver name of the given interface.
 func DriverName(intf string) (string, error) {
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_IP)
+	info, err := getDriverInfo(intf)
 	if err != nil {
 		return "", err
+	}
+	return string(bytes.Trim(info.driver[:], "\x00")), nil
+}
+
+// BusInfo returns the bus info of the given interface.
+func BusInfo(intf string) (string, error) {
+	info, err := getDriverInfo(intf)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes.Trim(info.bus_info[:], "\x00")), nil
+}
+
+func getDriverInfo(intf string) (ethtoolDrvInfo, error) {
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_IP)
+	if err != nil {
+		return ethtoolDrvInfo{}, err
 	}
 	defer syscall.Close(fd)
 
@@ -112,10 +129,10 @@ func DriverName(intf string) (string, error) {
 
 	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
-		return "", syscall.Errno(ep)
+		return ethtoolDrvInfo{}, syscall.Errno(ep)
 	}
 
-	return string(bytes.Trim(drvinfo.driver[:], "\x00")), nil
+	return drvinfo, nil
 }
 
 // Stats retrieves stats of the given interface name.
