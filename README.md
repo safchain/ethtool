@@ -19,9 +19,9 @@ In order to run te
 
 ## Examples ##
 
-Retrieve tx from eth0
-
 ```go
+package main
+
 import (
 	"fmt"
 
@@ -29,30 +29,23 @@ import (
 )
 
 func main() {
-	stats, err := ethtool.Stats("eth0")
+	ethHandle, err := ethtool.NewEthtool()
 	if err != nil {
-		panic
+		panic(err.Error())
 	}
 
+	// Retrieve tx from eth0
+	stats, err := ethHandle.Stats("eth0")
+	if err != nil {
+		panic(err.Error())
+	}
 	fmt.Printf("TX: %d\n", stats["tx_bytes"])
-}
-```
 
-Retrieve peer index of a veth interface
-
-```go
-import (
-	"fmt"
-
-	"github.com/safchain/ethtool"
-)
-
-func main() {
-	stats, err := ethtool.Stats("veth0")
+	// Retrieve peer index of a veth interface
+	stats, err = ethHandle.Stats("veth0")
 	if err != nil {
-		panic
+		panic(err.Error())
 	}
-
 	fmt.Printf("Peer Index: %d\n", stats["peer_ifindex"])
 }
 ```

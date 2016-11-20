@@ -36,14 +36,7 @@ type ethtoolValue struct { /* ethtool.c: struct ethtool_value */
 }
 
 // MsglvlGet returns the msglvl of the given interface.
-func MsglvlGet(intf string) (uint32, error) {
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM,
-		syscall.IPPROTO_IP)
-	if err != nil {
-		return 0, err
-	}
-	defer syscall.Close(fd)
-
+func (e *Ethtool) MsglvlGet(intf string) (uint32, error) {
 	edata := ethtoolValue{
 		cmd: ETHTOOL_GMSGLVL,
 	}
@@ -56,7 +49,7 @@ func MsglvlGet(intf string) (uint32, error) {
 		ifr_data: uintptr(unsafe.Pointer(&edata)),
 	}
 
-	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd),
 		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return 0, syscall.Errno(ep)
@@ -66,14 +59,7 @@ func MsglvlGet(intf string) (uint32, error) {
 }
 
 // MsglvlSet returns the read-msglvl, post-set-msglvl of the given interface.
-func MsglvlSet(intf string, valset uint32) (uint32, uint32, error) {
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM,
-		syscall.IPPROTO_IP)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer syscall.Close(fd)
-
+func (e *Ethtool) MsglvlSet(intf string, valset uint32) (uint32, uint32, error) {
 	edata := ethtoolValue{
 		cmd: ETHTOOL_GMSGLVL,
 	}
@@ -86,7 +72,7 @@ func MsglvlSet(intf string, valset uint32) (uint32, uint32, error) {
 		ifr_data: uintptr(unsafe.Pointer(&edata)),
 	}
 
-	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd),
 		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return 0, 0, syscall.Errno(ep)
@@ -97,11 +83,31 @@ func MsglvlSet(intf string, valset uint32) (uint32, uint32, error) {
 	edata.cmd = ETHTOOL_SMSGLVL
 	edata.data = valset
 
-	_, _, ep = syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
+	_, _, ep = syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd),
 		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return 0, 0, syscall.Errno(ep)
 	}
 
 	return readval, edata.data, nil
+}
+
+// MsglvlGet returns the msglvl of the given interface.
+func MsglvlGet(intf string) (uint32, error) {
+	e, err := NewEthtool()
+	if err != nil {
+		return 0, err
+	}
+	defer e.Close()
+	return e.MsglvlGet(intf)
+}
+
+// MsglvlSet returns the read-msglvl, post-set-msglvl of the given interface.
+func MsglvlSet(intf string, valset uint32) (uint32, uint32, error) {
+	e, err := NewEthtool()
+	if err != nil {
+		return 0, 0, err
+	}
+	defer e.Close()
+	return e.MsglvlSet(intf, valset)
 }

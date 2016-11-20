@@ -54,105 +54,23 @@ type EthtoolCmd struct { /* ethtool.c: struct ethtool_cmd */
 // CmdGet returns the interface settings in the receiver struct
 // and returns speed
 func (ecmd *EthtoolCmd) CmdGet(intf string) (uint32, error) {
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM,
-		syscall.IPPROTO_IP)
+	e, err := NewEthtool()
 	if err != nil {
 		return 0, err
 	}
-	defer syscall.Close(fd)
-
-	ecmd.Cmd = ETHTOOL_GSET
-
-	var name [IFNAMSIZ]byte
-	copy(name[:], []byte(intf))
-
-	ifr := ifreq{
-		ifr_name: name,
-		ifr_data: uintptr(unsafe.Pointer(ecmd)),
-	}
-
-	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
-		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
-	if ep != 0 {
-		return 0, syscall.Errno(ep)
-	}
-
-	var speedval uint32 = (uint32(ecmd.Speed_hi) << 16) |
-		(uint32(ecmd.Speed) & 0xffff)
-
-	return speedval, nil
+	defer e.Close()
+	return e.CmdGet(ecmd, intf)
 }
 
 // CmdSet sets and returns the settings in the receiver struct
 // and returns speed
 func (ecmd *EthtoolCmd) CmdSet(intf string) (uint32, error) {
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM,
-		syscall.IPPROTO_IP)
+	e, err := NewEthtool()
 	if err != nil {
 		return 0, err
 	}
-	defer syscall.Close(fd)
-
-	ecmd.Cmd = ETHTOOL_SSET
-
-	var name [IFNAMSIZ]byte
-	copy(name[:], []byte(intf))
-
-	ifr := ifreq{
-		ifr_name: name,
-		ifr_data: uintptr(unsafe.Pointer(ecmd)),
-	}
-
-	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
-		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
-	if ep != 0 {
-		return 0, syscall.Errno(ep)
-	}
-
-	var speedval uint32 = (uint32(ecmd.Speed_hi) << 16) |
-		(uint32(ecmd.Speed) & 0xffff)
-
-	return speedval, nil
-}
-
-// CmdGetMapped returns the interface settings in a map
-func CmdGetMapped(intf string) (map[string]uint64, error) {
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM,
-		syscall.IPPROTO_IP)
-	if err != nil {
-		return nil, err
-	}
-	defer syscall.Close(fd)
-
-	ecmd := EthtoolCmd{
-		Cmd: ETHTOOL_GSET,
-	}
-
-	var name [IFNAMSIZ]byte
-	copy(name[:], []byte(intf))
-
-	ifr := ifreq{
-		ifr_name: name,
-		ifr_data: uintptr(unsafe.Pointer(&ecmd)),
-	}
-
-	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
-		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
-	if ep != 0 {
-		return nil, syscall.Errno(ep)
-	}
-
-	var result = make(map[string]uint64)
-
-	// ref https://gist.github.com/drewolson/4771479
-	// Golang Reflection Example
-	ecmd.reflect(&result)
-
-	var speedval uint32 = (uint32(ecmd.Speed_hi) << 16) |
-		(uint32(ecmd.Speed) & 0xffff)
-	result["speed"] = uint64(speedval)
-
-	return result, nil
+	defer e.Close()
+	return e.CmdSet(ecmd, intf)
 }
 
 func (f *EthtoolCmd) reflect(retv *map[string]uint64) {
@@ -187,4 +105,96 @@ func (f *EthtoolCmd) reflect(retv *map[string]uint64) {
 		//fmt.Printf("Field Name: %s,\t Field Value: %v,\t Tag Value: %s\n",
 		//	typeField.Name, valueField.Interface(), tag.Get("tag_name"))
 	}
+}
+
+// CmdGet returns the interface settings in the receiver struct
+// and returns speed
+func (e *Ethtool) CmdGet(ecmd *EthtoolCmd, intf string) (uint32, error) {
+	ecmd.Cmd = ETHTOOL_GSET
+
+	var name [IFNAMSIZ]byte
+	copy(name[:], []byte(intf))
+
+	ifr := ifreq{
+		ifr_name: name,
+		ifr_data: uintptr(unsafe.Pointer(ecmd)),
+	}
+
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd),
+		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+	if ep != 0 {
+		return 0, syscall.Errno(ep)
+	}
+
+	var speedval uint32 = (uint32(ecmd.Speed_hi) << 16) |
+		(uint32(ecmd.Speed) & 0xffff)
+
+	return speedval, nil
+}
+
+// CmdSet sets and returns the settings in the receiver struct
+// and returns speed
+func (e *Ethtool) CmdSet(ecmd *EthtoolCmd, intf string) (uint32, error) {
+	ecmd.Cmd = ETHTOOL_SSET
+
+	var name [IFNAMSIZ]byte
+	copy(name[:], []byte(intf))
+
+	ifr := ifreq{
+		ifr_name: name,
+		ifr_data: uintptr(unsafe.Pointer(ecmd)),
+	}
+
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd),
+		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+	if ep != 0 {
+		return 0, syscall.Errno(ep)
+	}
+
+	var speedval uint32 = (uint32(ecmd.Speed_hi) << 16) |
+		(uint32(ecmd.Speed) & 0xffff)
+
+	return speedval, nil
+}
+
+// CmdGetMapped returns the interface settings in a map
+func (e *Ethtool) CmdGetMapped(intf string) (map[string]uint64, error) {
+	ecmd := EthtoolCmd{
+		Cmd: ETHTOOL_GSET,
+	}
+
+	var name [IFNAMSIZ]byte
+	copy(name[:], []byte(intf))
+
+	ifr := ifreq{
+		ifr_name: name,
+		ifr_data: uintptr(unsafe.Pointer(&ecmd)),
+	}
+
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd),
+		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+	if ep != 0 {
+		return nil, syscall.Errno(ep)
+	}
+
+	var result = make(map[string]uint64)
+
+	// ref https://gist.github.com/drewolson/4771479
+	// Golang Reflection Example
+	ecmd.reflect(&result)
+
+	var speedval uint32 = (uint32(ecmd.Speed_hi) << 16) |
+		(uint32(ecmd.Speed) & 0xffff)
+	result["speed"] = uint64(speedval)
+
+	return result, nil
+}
+
+func CmdGetMapped(intf string) (map[string]uint64, error) {
+	e, err := NewEthtool()
+	if err != nil {
+		return nil, err
+	}
+	defer e.Close()
+	return e.CmdGetMapped(intf)
 }
