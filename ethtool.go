@@ -50,10 +50,10 @@ const (
 	ETHTOOL_GSTRINGS = 0x0000001b
 	ETHTOOL_GSTATS   = 0x0000001d
 	// other CMDs from ethtool-copy.h of ethtool-3.5 package
-	ETHTOOL_GSET     = 0x00000001 /* Get settings. */
-	ETHTOOL_SSET     = 0x00000002 /* Set settings. */
-	ETHTOOL_GMSGLVL  = 0x00000007 /* Get driver message level */
-	ETHTOOL_SMSGLVL  = 0x00000008 /* Set driver msg level. */
+	ETHTOOL_GSET    = 0x00000001 /* Get settings. */
+	ETHTOOL_SSET    = 0x00000002 /* Set settings. */
+	ETHTOOL_GMSGLVL = 0x00000007 /* Get driver message level */
+	ETHTOOL_SMSGLVL = 0x00000008 /* Set driver msg level. */
 )
 
 // MAX_GSTRINGS maximum number of stats entries that ethtool can
@@ -95,9 +95,13 @@ type ethtoolStats struct {
 	data    [MAX_GSTRINGS]uint64
 }
 
+type Ethtool struct {
+	fd int
+}
+
 // DriverName returns the driver name of the given interface.
-func DriverName(intf string) (string, error) {
-	info, err := getDriverInfo(intf)
+func (e *Ethtool) DriverName(intf string) (string, error) {
+	info, err := e.getDriverInfo(intf)
 	if err != nil {
 		return "", err
 	}
@@ -105,21 +109,15 @@ func DriverName(intf string) (string, error) {
 }
 
 // BusInfo returns the bus info of the given interface.
-func BusInfo(intf string) (string, error) {
-	info, err := getDriverInfo(intf)
+func (e *Ethtool) BusInfo(intf string) (string, error) {
+	info, err := e.getDriverInfo(intf)
 	if err != nil {
 		return "", err
 	}
 	return string(bytes.Trim(info.bus_info[:], "\x00")), nil
 }
 
-func getDriverInfo(intf string) (ethtoolDrvInfo, error) {
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_IP)
-	if err != nil {
-		return ethtoolDrvInfo{}, err
-	}
-	defer syscall.Close(fd)
-
+func (e *Ethtool) getDriverInfo(intf string) (ethtoolDrvInfo, error) {
 	drvinfo := ethtoolDrvInfo{
 		cmd: ETHTOOL_GDRVINFO,
 	}
@@ -132,7 +130,7 @@ func getDriverInfo(intf string) (ethtoolDrvInfo, error) {
 		ifr_data: uintptr(unsafe.Pointer(&drvinfo)),
 	}
 
-	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return ethtoolDrvInfo{}, syscall.Errno(ep)
 	}
@@ -141,13 +139,7 @@ func getDriverInfo(intf string) (ethtoolDrvInfo, error) {
 }
 
 // Stats retrieves stats of the given interface name.
-func Stats(intf string) (map[string]uint64, error) {
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_IP)
-	if err != nil {
-		return nil, err
-	}
-	defer syscall.Close(fd)
-
+func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
 	drvinfo := ethtoolDrvInfo{
 		cmd: ETHTOOL_GDRVINFO,
 	}
@@ -160,7 +152,7 @@ func Stats(intf string) (map[string]uint64, error) {
 		ifr_data: uintptr(unsafe.Pointer(&drvinfo)),
 	}
 
-	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return nil, syscall.Errno(ep)
 	}
@@ -177,7 +169,7 @@ func Stats(intf string) (map[string]uint64, error) {
 	}
 	ifr.ifr_data = uintptr(unsafe.Pointer(&gstrings))
 
-	_, _, ep = syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+	_, _, ep = syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return nil, syscall.Errno(ep)
 	}
@@ -190,7 +182,7 @@ func Stats(intf string) (map[string]uint64, error) {
 
 	ifr.ifr_data = uintptr(unsafe.Pointer(&stats))
 
-	_, _, ep = syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+	_, _, ep = syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return nil, syscall.Errno(ep)
 	}
@@ -203,4 +195,46 @@ func Stats(intf string) (map[string]uint64, error) {
 	}
 
 	return result, nil
+}
+
+func (e *Ethtool) Close() {
+	syscall.Close(e.fd)
+}
+
+func NewEthtool() (*Ethtool, error) {
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_IP)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Ethtool{
+		fd: fd,
+	}, nil
+}
+
+func BusInfo(intf string) (string, error) {
+	e, err := NewEthtool()
+	if err != nil {
+		return "", err
+	}
+	defer e.Close()
+	return e.BusInfo(intf)
+}
+
+func DriverName(intf string) (string, error) {
+	e, err := NewEthtool()
+	if err != nil {
+		return "", err
+	}
+	defer e.Close()
+	return e.DriverName(intf)
+}
+
+func Stats(intf string) (map[string]uint64, error) {
+	e, err := NewEthtool()
+	if err != nil {
+		return nil, err
+	}
+	defer e.Close()
+	return e.Stats(intf)
 }
