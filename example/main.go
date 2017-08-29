@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/safchain/ethtool"
+	//	"github.com/safchain/ethtool"
+	"gitlab.trading.imc.intra/go/ethtool"
 )
 
 func main() {
