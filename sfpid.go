@@ -2,13 +2,26 @@ package ethtool
 
 import (
 	"fmt"
+	"unsafe"
 )
 
 type sff8079 struct {
-	ExtIdentifier string
-	Connector     string
-	TransCodes    string
-	TransTypes    []string
+	ExtIdentifier   string
+	Connector       string
+	TransCodes      string
+	TransTypes      []string
+	Encoding        string
+	BRNominal       string
+	RateIdentifier  string
+	LengthSMFKm     string
+	LengthSMF       string
+	Length50Um      string
+	Length62_5Um    string
+	LengthCopper    string
+	LengthOM3       string
+	PasveCuCompl    string
+	ActveCuCompl    string
+	LaserWaveLength string
 }
 
 func ParseSFF8079(id []byte) (sff8079, error) {
@@ -262,6 +275,109 @@ func ParseSFF8079(id []byte) (sff8079, error) {
 	}
 	if id[10]&(1<<0) != 0 {
 		sff.TransTypes = append(sff.TransTypes, "FC: 100 MBytes/sec")
+	}
+
+	// Encoding
+	sff.Encoding = fmt.Sprintf("0x%02x ", id[11])
+	switch id[11] {
+	case 0x00:
+		sff.Encoding += "(unspecified)"
+	case 0x01:
+		sff.Encoding += "(8B/10B)"
+	case 0x02:
+		sff.Encoding += "(4B/5B)"
+	case 0x03:
+		sff.Encoding += "(NRZ)"
+	case 0x04:
+		sff.Encoding += "(Manchester)"
+	case 0x05:
+		sff.Encoding += "(SONET Scrambled)"
+	case 0x06:
+		sff.Encoding += "(64B/66B)"
+	default:
+		sff.Encoding += "(reserved or unknown)"
+	}
+
+	// BR nominal
+	vp := *(*uint8)(unsafe.Pointer(&id[12]))
+	vm := uint(vp) * 100
+	sff.BRNominal = fmt.Sprintf("%d%s", vm, "MBd")
+
+	// Rate identifier
+	sff.RateIdentifier = fmt.Sprintf("0x%02x ", id[13])
+	switch id[13] {
+	case 0x00:
+		sff.RateIdentifier += "(unspecified)"
+	case 0x01:
+		sff.RateIdentifier += "(4/2/1G Rate_Select & AS0/AS1)"
+	case 0x02:
+		sff.RateIdentifier += "(8/4/2G Rx Rate_Select only)"
+	case 0x03:
+		sff.RateIdentifier += "(8/4/2G Independent Rx & Tx Rate_Select)"
+	case 0x04:
+		sff.RateIdentifier += "(8/4/2G Tx Rate_Select only)"
+	default:
+		sff.RateIdentifier += "(reserved or unknown)"
+	}
+
+	// Length smf km
+	vp = *(*uint8)(unsafe.Pointer(&id[14]))
+	sff.LengthSMFKm = fmt.Sprintf("%d%s", vp, "km")
+
+	// Length smf
+	vp = *(*uint8)(unsafe.Pointer(&id[15]))
+	vm = uint(vp) * 100
+	sff.LengthSMF = fmt.Sprintf("%d%s", vm, "m")
+
+	// Length smf
+	vp = *(*uint8)(unsafe.Pointer(&id[16]))
+	vm = uint(vp) * 10
+	sff.Length50Um = fmt.Sprintf("%d%s", vm, "m")
+
+	// Length 62.5 um
+	vp = *(*uint8)(unsafe.Pointer(&id[17]))
+	vm = uint(vp) * 10
+	sff.Length62_5Um = fmt.Sprintf("%d%s", vm, "m")
+
+	// Length copper
+	vp = *(*uint8)(unsafe.Pointer(&id[18]))
+	sff.LengthCopper = fmt.Sprintf("%d%s", vp, "m")
+
+	// Length (OM3)
+	vp = *(*uint8)(unsafe.Pointer(&id[19]))
+	vm = uint(vp) * 10
+	sff.LengthOM3 = fmt.Sprintf("%d%s", vm, "m")
+
+	// PasveCuCompl
+	// ActveCuCompl
+	// LaserWaveLength
+
+	if id[8]&(1<<2) != 0 {
+		sff.PasveCuCompl = fmt.Sprintf("0x%02x ", id[60])
+		switch id[60] {
+		case 0x00:
+			sff.PasveCuCompl += "(unspecified)"
+		case 0x01:
+			sff.PasveCuCompl += "(SFF-8431 appendix E)"
+		default:
+			sff.PasveCuCompl += "(unknown)"
+		}
+		sff.PasveCuCompl += " [SFF-8472 rev10.4 only]"
+	} else if id[8]&(1<<3) != 0 {
+		sff.ActveCuCompl = fmt.Sprintf("0x%02x ", id[60])
+		switch id[60] {
+		case 0x00:
+			sff.ActveCuCompl += "(unspecified)"
+		case 0x01:
+			sff.ActveCuCompl += "(SFF-8431 appendix E)"
+		case 0x04:
+			sff.ActveCuCompl += "(SFF-8431 limiting)"
+		default:
+			sff.ActveCuCompl += "(unknown)"
+		}
+		sff.ActveCuCompl += " [SFF-8472 rev10.4 only]"
+	} else {
+		sff.LaserWaveLength = fmt.Sprintf("%u%s", (id[60]<<8)|id[61], "nm")
 	}
 
 	return sff, nil
