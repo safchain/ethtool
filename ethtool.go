@@ -104,7 +104,6 @@ type ethtoolEeprom struct {
 	offset uint32
 	len    uint32
 	data   [MAX_GSTRINGS]byte
-	//	data   [MAX_GSTRINGS]uint8
 }
 
 type ethtoolModInfo struct {
@@ -142,7 +141,7 @@ func (e *Ethtool) Eeprom(intf string) (string, error) {
 		return "", err
 	}
 
-	return hex.EncodeToString(eeprom.data[:]), nil
+	return hex.EncodeToString(eeprom.data[:eeprom.len]), nil
 }
 
 func (e *Ethtool) DriverInfo(intf string) (ethtoolDrvInfo, error) {
