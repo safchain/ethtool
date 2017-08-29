@@ -135,13 +135,22 @@ func (e *Ethtool) BusInfo(intf string) (string, error) {
 	return string(bytes.Trim(info.bus_info[:], "\x00")), nil
 }
 
-func (e *Ethtool) Eeprom(intf string) (string, error) {
-	eeprom, err := e.getEeprom(intf)
+func (e *Ethtool) ModuleEeprom(intf string) (string, error) {
+	eeprom, err := e.getModuleEeprom(intf)
 	if err != nil {
 		return "", err
 	}
 
 	return hex.EncodeToString(eeprom.data[:eeprom.len]), nil
+}
+
+func (e *Ethtool) ModuleInfo(intf string) (sff8079, error) {
+	eeprom, err := e.getModuleEeprom(intf)
+	if err != nil {
+		return sff8079{}, err
+	}
+
+	return ParseSFF8079(eeprom.data[:eeprom.len])
 }
 
 func (e *Ethtool) DriverInfo(intf string) (ethtoolDrvInfo, error) {
@@ -174,7 +183,7 @@ func (e *Ethtool) getDriverInfo(intf string) (ethtoolDrvInfo, error) {
 	return drvinfo, nil
 }
 
-func (e *Ethtool) getEeprom(intf string) (ethtoolEeprom, error) {
+func (e *Ethtool) getModuleEeprom(intf string) (ethtoolEeprom, error) {
 	modInfo := ethtoolModInfo{
 		cmd: ETHTOOL_GMODULEINFO,
 	}

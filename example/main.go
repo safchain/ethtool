@@ -57,9 +57,15 @@ func main() {
 	}
 	fmt.Printf("drvrinfo: %+v\n", drvInfo)
 
-	eeprom, err := e.Eeprom(*name)
+	eeprom, err := e.ModuleEeprom(*name)
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Printf("eeprom: %+v\n", eeprom)
+	fmt.Printf("module eeprom: %+v\n", eeprom)
+
+	modInfo, err := e.ModuleInfo(*name)
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Printf("module info: %+v\n", modInfo)
 }
