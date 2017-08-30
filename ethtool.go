@@ -57,6 +57,8 @@ const (
 	ETHTOOL_SMSGLVL       = 0x00000008 /* Set driver msg level. */
 	ETHTOOL_GMODULEINFO   = 0x00000042 /* Get plug-in module information */
 	ETHTOOL_GMODULEEEPROM = 0x00000043 /* Get plug-in module eeprom */
+	ETH_MODULE_SFF_8079   = 0x1
+	ETH_MODULE_SFF_8472   = 0x2
 )
 
 // MAX_GSTRINGS maximum number of stats entries that ethtool can
@@ -137,7 +139,7 @@ func (e *Ethtool) BusInfo(intf string) (string, error) {
 }
 
 func (e *Ethtool) ModuleEeprom(intf string) (string, error) {
-	eeprom, err := e.getModuleEeprom(intf)
+	eeprom, _, err := e.getModuleEeprom(intf)
 	if err != nil {
 		return "", err
 	}
@@ -146,12 +148,19 @@ func (e *Ethtool) ModuleEeprom(intf string) (string, error) {
 }
 
 func (e *Ethtool) ModuleInfo(intf string) (sff8079, error) {
-	eeprom, err := e.getModuleEeprom(intf)
+	eeprom, modInfo, err := e.getModuleEeprom(intf)
 	if err != nil {
 		return sff8079{}, err
 	}
 
-	return ParseSFF8079(eeprom.data[:eeprom.len])
+	switch modInfo.tpe {
+	case ETH_MODULE_SFF_8079:
+		return ParseSFF8079(eeprom.data[:eeprom.len])
+	case ETH_MODULE_SFF_8472:
+		return ParseSFF8079(eeprom.data[:eeprom.len])
+	}
+
+	return sff8079{}, fmt.Errorf("module doesn't support SFF-8079 or SFF-8472")
 }
 
 func (e *Ethtool) DriverInfo(intf string) (ethtoolDrvInfo, error) {
@@ -184,7 +193,7 @@ func (e *Ethtool) getDriverInfo(intf string) (ethtoolDrvInfo, error) {
 	return drvinfo, nil
 }
 
-func (e *Ethtool) getModuleEeprom(intf string) (ethtoolEeprom, error) {
+func (e *Ethtool) getModuleEeprom(intf string) (ethtoolEeprom, ethtoolModInfo, error) {
 	modInfo := ethtoolModInfo{
 		cmd: ETHTOOL_GMODULEINFO,
 	}
@@ -199,7 +208,7 @@ func (e *Ethtool) getModuleEeprom(intf string) (ethtoolEeprom, error) {
 
 	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
-		return ethtoolEeprom{}, syscall.Errno(ep)
+		return ethtoolEeprom{}, ethtoolModInfo{}, syscall.Errno(ep)
 	}
 
 	eeprom := ethtoolEeprom{
@@ -212,10 +221,10 @@ func (e *Ethtool) getModuleEeprom(intf string) (ethtoolEeprom, error) {
 
 	_, _, ep = syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
-		return ethtoolEeprom{}, syscall.Errno(ep)
+		return ethtoolEeprom{}, ethtoolModInfo{}, syscall.Errno(ep)
 	}
 
-	return eeprom, nil
+	return eeprom, modInfo, nil
 }
 
 // Stats retrieves stats of the given interface name.
