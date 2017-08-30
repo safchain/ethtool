@@ -26,6 +26,11 @@ type sff8079 struct {
 	VendorOUI       string
 	VendorPN        string
 	VendorRev       string
+	OptionVals      string
+	BRMarginMax     string
+	BRMarginMin     string
+	VendorSN        string
+	DateCode        string
 }
 
 func ParseSFF8079(id []byte) (sff8079, error) {
@@ -401,6 +406,66 @@ func ParseSFF8079(id []byte) (sff8079, error) {
 	// Vendor rev
 	for i := 56; i <= 59; i++ {
 		sff.VendorRev += string(id[i])
+	}
+
+	// Options values
+	sff.OptionVals = fmt.Sprintf("0x%02x 0x%02x\n", id[64], id[65])
+	if id[65]&(1<<1) != 0 {
+		sff.OptionVals += "RX_LOS implemented"
+	}
+	if id[65]&(1<<2) != 0 {
+		sff.OptionVals += "RX_LOS implemented, inverted"
+	}
+	if id[65]&(1<<3) != 0 {
+		sff.OptionVals += "TX_FAULT implemented"
+	}
+	if id[65]&(1<<4) != 0 {
+		sff.OptionVals += "TX_DISABLE implemented"
+	}
+	if id[65]&(1<<5) != 0 {
+		sff.OptionVals += "RATE_SELECT implemented"
+	}
+	if id[65]&(1<<6) != 0 {
+		sff.OptionVals += "Tunable transmitter technology"
+	}
+	if id[65]&(1<<7) != 0 {
+		sff.OptionVals += "Receiver decision threshold implemented"
+	}
+	if id[64]&(1<<0) != 0 {
+		sff.OptionVals += "Linear receiver output implemented"
+	}
+	if id[64]&(1<<1) != 0 {
+		sff.OptionVals += "Power level 2 requirement"
+	}
+	if id[64]&(1<<2) != 0 {
+		sff.OptionVals += "Cooled transceiver implemented"
+	}
+	if id[64]&(1<<3) != 0 {
+		sff.OptionVals += "Retimer or CDR implemented"
+	}
+	if id[64]&(1<<4) != 0 {
+		sff.OptionVals += "Paging implemented"
+	}
+	if id[64]&(1<<5) != 0 {
+		sff.OptionVals += "Power level 3 requirement"
+	}
+
+	// BR margin max
+	vp = *(*uint8)(unsafe.Pointer(&id[66]))
+	sff.BRMarginMax = fmt.Sprintf("%d%s", vp, "%")
+
+	// BR margin min
+	vp = *(*uint8)(unsafe.Pointer(&id[67]))
+	sff.BRMarginMin = fmt.Sprintf("%d%s", vp, "%")
+
+	// Vendor SN
+	for i := 68; i <= 83; i++ {
+		sff.VendorSN += string(id[i])
+	}
+
+	// Date code
+	for i := 84; i <= 91; i++ {
+		sff.DateCode += string(id[i])
 	}
 
 	return sff, nil
