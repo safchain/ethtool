@@ -33,9 +33,9 @@ type SFF8079 struct {
 	DateCode        string
 }
 
-func ParseSFF8079(id []byte) (SFF8079, error) {
+func ParseSFF8079(id []byte) (*SFF8079, error) {
 	if id[0] != 0x03 && id[1] != 0x04 {
-		return SFF8079{}, fmt.Errorf("unknown eeprom format, not sff-8079")
+		return nil, fmt.Errorf("unknown eeprom format, not sff-8079")
 	}
 
 	sff := SFF8079{}
@@ -468,5 +468,5 @@ func ParseSFF8079(id []byte) (SFF8079, error) {
 		sff.DateCode += string(id[i])
 	}
 
-	return sff, nil
+	return &sff, nil
 }

@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/safchain/ethtool"
+	//	"github.com/mickep76/ethtool"
 )
 
 func main() {
