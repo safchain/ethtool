@@ -63,6 +63,7 @@ const (
 // retrieve currently.
 const (
 	MAX_GSTRINGS = 1000
+	EEPROM_LEN   = 500
 )
 
 type ifreq struct {
@@ -103,7 +104,7 @@ type ethtoolEeprom struct {
 	magic  uint32
 	offset uint32
 	len    uint32
-	data   [MAX_GSTRINGS]byte
+	data   [EEPROM_LEN]byte
 }
 
 type ethtoolModInfo struct {

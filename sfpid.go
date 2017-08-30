@@ -22,6 +22,10 @@ type sff8079 struct {
 	PasveCuCompl    string
 	ActveCuCompl    string
 	LaserWaveLength string
+	VendorName      string
+	VendorOUI       string
+	VendorPN        string
+	VendorRev       string
 }
 
 func ParseSFF8079(id []byte) (sff8079, error) {
@@ -348,10 +352,9 @@ func ParseSFF8079(id []byte) (sff8079, error) {
 	vm = uint(vp) * 10
 	sff.LengthOM3 = fmt.Sprintf("%d%s", vm, "m")
 
-	// PasveCuCompl
-	// ActveCuCompl
-	// LaserWaveLength
-
+	// Passive cu compliance
+	// Active cu compliance
+	// Laser wave length
 	if id[8]&(1<<2) != 0 {
 		sff.PasveCuCompl = fmt.Sprintf("0x%02x ", id[60])
 		switch id[60] {
@@ -378,6 +381,26 @@ func ParseSFF8079(id []byte) (sff8079, error) {
 		sff.ActveCuCompl += " [SFF-8472 rev10.4 only]"
 	} else {
 		sff.LaserWaveLength = fmt.Sprintf("%u%s", (id[60]<<8)|id[61], "nm")
+	}
+
+	// Vendor name
+	for i := 20; i <= 35; i++ {
+		sff.VendorName += string(id[i])
+	}
+
+	//                putchar(((val >= 32) && (val <= 126)) ? val : '_');
+
+	// Vendor OUI
+	sff.VendorOUI = fmt.Sprintf("%02x:%02x:%02x", id[37], id[38], id[39])
+
+	// Vendor PN
+	for i := 40; i <= 55; i++ {
+		sff.VendorPN += string(id[i])
+	}
+
+	// Vendor rev
+	for i := 56; i <= 59; i++ {
+		sff.VendorRev += string(id[i])
 	}
 
 	return sff, nil
