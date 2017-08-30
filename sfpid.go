@@ -2,35 +2,36 @@ package ethtool
 
 import (
 	"fmt"
+	"strings"
 	"unsafe"
 )
 
 type SFF8079 struct {
-	ExtIdentifier   string
-	Connector       string
-	TransCodes      string
-	TransTypes      []string
-	Encoding        string
-	BRNominal       string
-	RateIdentifier  string
-	LengthSMFKm     string
-	LengthSMF       string
-	Length50Um      string
-	Length62_5Um    string
-	LengthCopper    string
-	LengthOM3       string
-	PasveCuCompl    string
-	ActveCuCompl    string
-	LaserWaveLength string
-	VendorName      string
-	VendorOUI       string
-	VendorPN        string
-	VendorRev       string
-	OptionVals      string
-	BRMarginMax     string
-	BRMarginMin     string
-	VendorSN        string
-	DateCode        string
+	ExtIdentifier  string   `json:"extIdentifier"`
+	Connector      string   `json:"connector"`
+	TransCodes     string   `json:"transCodes"`
+	TransTypes     []string `json:"transTypes"`
+	Encoding       string   `json:"encoding"`
+	BRNominal      string   `json:"brNominal"`
+	RateIdentifier string   `json:"rateIdentifier"`
+	LengthSMFKm    string   `json:"lengthSMFKm"`
+	LengthSMF      string   `json:"lengthSMF"`
+	Length50Um     string   `json:"length50Um"`
+	Length62_5Um   string   `json:"length62_5Um"`
+	LengthCopper   string   `json:"lengthCopper"`
+	LengthOM3      string   `json:"lengthOM3"`
+	PasveCuCompl   string   `json:"pasveCuCompl,omitempty"`
+	ActveCuCompl   string   `json:"actveCuCompl,omitempty"`
+	LaserWaveLen   string   `json:"laserWaveLen,omitempty"`
+	VendorName     string   `json:"vendorName"`
+	VendorOUI      string   `json:"vendorOUI"`
+	VendorPN       string   `json:"vendorPN"`
+	VendorRev      string   `json:"vendorRev"`
+	OptionVals     string   `json:"optionVals"`
+	BRMarginMax    string   `json:"brMarginMax"`
+	BRMarginMin    string   `json:"brMarginMin"`
+	VendorSN       string   `json:"vendorSN"`
+	DateCode       string   `json:"dateCode"`
 }
 
 func ParseSFF8079(id []byte) (*SFF8079, error) {
@@ -385,15 +386,14 @@ func ParseSFF8079(id []byte) (*SFF8079, error) {
 		}
 		sff.ActveCuCompl += " [SFF-8472 rev10.4 only]"
 	} else {
-		sff.LaserWaveLength = fmt.Sprintf("%u%s", (id[60]<<8)|id[61], "nm")
+		sff.LaserWaveLen = fmt.Sprintf("%u%s", (id[60]<<8)|id[61], "nm")
 	}
 
 	// Vendor name
 	for i := 20; i <= 35; i++ {
 		sff.VendorName += string(id[i])
 	}
-
-	//                putchar(((val >= 32) && (val <= 126)) ? val : '_');
+	sff.VendorName = strings.TrimSpace(sff.VendorName)
 
 	// Vendor OUI
 	sff.VendorOUI = fmt.Sprintf("%02x:%02x:%02x", id[37], id[38], id[39])
@@ -402,11 +402,13 @@ func ParseSFF8079(id []byte) (*SFF8079, error) {
 	for i := 40; i <= 55; i++ {
 		sff.VendorPN += string(id[i])
 	}
+	sff.VendorPN = strings.TrimSpace(sff.VendorPN)
 
 	// Vendor rev
 	for i := 56; i <= 59; i++ {
 		sff.VendorRev += string(id[i])
 	}
+	sff.VendorRev = strings.TrimSpace(sff.VendorRev)
 
 	// Options values
 	sff.OptionVals = fmt.Sprintf("0x%02x 0x%02x\n", id[64], id[65])
@@ -462,11 +464,13 @@ func ParseSFF8079(id []byte) (*SFF8079, error) {
 	for i := 68; i <= 83; i++ {
 		sff.VendorSN += string(id[i])
 	}
+	sff.VendorSN = strings.TrimSpace(sff.VendorSN)
 
 	// Date code
 	for i := 84; i <= 91; i++ {
 		sff.DateCode += string(id[i])
 	}
+	sff.DateCode = strings.TrimSpace(sff.DateCode)
 
 	return &sff, nil
 }
