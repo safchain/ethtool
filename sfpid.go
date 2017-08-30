@@ -12,14 +12,14 @@ type SFF8079 struct {
 	TransCodes     string   `json:"transCodes"`
 	TransTypes     []string `json:"transTypes"`
 	Encoding       string   `json:"encoding"`
-	BRNominal      string   `json:"brNominal"`
+	BRNominalMBd   uint     `json:"brNominalMBd"`
 	RateIdentifier string   `json:"rateIdentifier"`
-	LengthSMFKm    string   `json:"lengthSMFKm"`
-	LengthSMF      string   `json:"lengthSMF"`
-	Length50Um     string   `json:"length50Um"`
-	Length62_5Um   string   `json:"length62_5Um"`
-	LengthCopper   string   `json:"lengthCopper"`
-	LengthOM3      string   `json:"lengthOM3"`
+	CableSMFLenKm  uint     `json:"CableSMFLenKm"`
+	CableSMFLenM   uint     `json:"CableSMFLenM"`
+	Cable50umLenM  uint     `json:"Cable50umLenM"`
+	Cable625umLenM uint     `json:"Cable625umLenM"`
+	CableCprLenM   uint     `json:"CableCprLenM"`
+	CableOM3LenM   uint     `json:"CableOM3LenM"`
 	PasveCuCompl   string   `json:"pasveCuCompl,omitempty"`
 	ActveCuCompl   string   `json:"actveCuCompl,omitempty"`
 	LaserWaveLen   string   `json:"laserWaveLen,omitempty"`
@@ -28,8 +28,8 @@ type SFF8079 struct {
 	VendorPN       string   `json:"vendorPN"`
 	VendorRev      string   `json:"vendorRev"`
 	OptionVals     string   `json:"optionVals"`
-	BRMarginMax    string   `json:"brMarginMax"`
-	BRMarginMin    string   `json:"brMarginMin"`
+	BRMargMaxPerc  uint     `json:"brMargMaxPerc"`
+	BRMargMinPerc  uint     `json:"brMargMinPerc"`
 	VendorSN       string   `json:"vendorSN"`
 	DateCode       string   `json:"dateCode"`
 }
@@ -309,9 +309,8 @@ func ParseSFF8079(id []byte) (*SFF8079, error) {
 	}
 
 	// BR nominal
-	vp := *(*uint8)(unsafe.Pointer(&id[12]))
-	vm := uint(vp) * 100
-	sff.BRNominal = fmt.Sprintf("%d%s", vm, "MBd")
+	v := *(*uint8)(unsafe.Pointer(&id[12]))
+	sff.BRNominalMBd = uint(v) * 100
 
 	// Rate identifier
 	sff.RateIdentifier = fmt.Sprintf("0x%02x ", id[13])
@@ -330,33 +329,29 @@ func ParseSFF8079(id []byte) (*SFF8079, error) {
 		sff.RateIdentifier += "(reserved or unknown)"
 	}
 
-	// Length smf km
-	vp = *(*uint8)(unsafe.Pointer(&id[14]))
-	sff.LengthSMFKm = fmt.Sprintf("%d%s", vp, "km")
+	// Length SMF km
+	v = *(*uint8)(unsafe.Pointer(&id[14]))
+	sff.CableSMFLenKm = uint(v)
 
-	// Length smf
-	vp = *(*uint8)(unsafe.Pointer(&id[15]))
-	vm = uint(vp) * 100
-	sff.LengthSMF = fmt.Sprintf("%d%s", vm, "m")
+	// Length SMF
+	v = *(*uint8)(unsafe.Pointer(&id[15]))
+	sff.CableSMFLenM = uint(v) * 100
 
-	// Length smf
-	vp = *(*uint8)(unsafe.Pointer(&id[16]))
-	vm = uint(vp) * 10
-	sff.Length50Um = fmt.Sprintf("%d%s", vm, "m")
+	// Length 50um
+	v = *(*uint8)(unsafe.Pointer(&id[16]))
+	sff.Cable50umLenM = uint(v) * 10
 
-	// Length 62.5 um
-	vp = *(*uint8)(unsafe.Pointer(&id[17]))
-	vm = uint(vp) * 10
-	sff.Length62_5Um = fmt.Sprintf("%d%s", vm, "m")
+	// Length 62.5um
+	v = *(*uint8)(unsafe.Pointer(&id[17]))
+	sff.Cable625umLenM = uint(v) * 10
 
 	// Length copper
-	vp = *(*uint8)(unsafe.Pointer(&id[18]))
-	sff.LengthCopper = fmt.Sprintf("%d%s", vp, "m")
+	v = *(*uint8)(unsafe.Pointer(&id[18]))
+	sff.CableCprLenM = uint(v)
 
-	// Length (OM3)
-	vp = *(*uint8)(unsafe.Pointer(&id[19]))
-	vm = uint(vp) * 10
-	sff.LengthOM3 = fmt.Sprintf("%d%s", vm, "m")
+	// Length OM3
+	v = *(*uint8)(unsafe.Pointer(&id[19]))
+	sff.CableOM3LenM = uint(v) * 10
 
 	// Passive cu compliance
 	// Active cu compliance
@@ -453,12 +448,12 @@ func ParseSFF8079(id []byte) (*SFF8079, error) {
 	}
 
 	// BR margin max
-	vp = *(*uint8)(unsafe.Pointer(&id[66]))
-	sff.BRMarginMax = fmt.Sprintf("%d%s", vp, "%")
+	v = *(*uint8)(unsafe.Pointer(&id[66]))
+	sff.BRMargMaxPerc = uint(v)
 
 	// BR margin min
-	vp = *(*uint8)(unsafe.Pointer(&id[67]))
-	sff.BRMarginMin = fmt.Sprintf("%d%s", vp, "%")
+	v = *(*uint8)(unsafe.Pointer(&id[67]))
+	sff.BRMargMinPerc = uint(v)
 
 	// Vendor SN
 	for i := 68; i <= 83; i++ {
