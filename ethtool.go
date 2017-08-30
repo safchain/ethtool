@@ -147,10 +147,10 @@ func (e *Ethtool) ModuleEeprom(intf string) (string, error) {
 	return hex.EncodeToString(eeprom.data[:eeprom.len]), nil
 }
 
-func (e *Ethtool) ModuleInfo(intf string) (sff8079, error) {
+func (e *Ethtool) ModuleInfo(intf string) (SFF8079, error) {
 	eeprom, modInfo, err := e.getModuleEeprom(intf)
 	if err != nil {
-		return sff8079{}, err
+		return SFF8079{}, err
 	}
 
 	switch modInfo.tpe {
@@ -160,7 +160,7 @@ func (e *Ethtool) ModuleInfo(intf string) (sff8079, error) {
 		return ParseSFF8079(eeprom.data[:eeprom.len])
 	}
 
-	return sff8079{}, fmt.Errorf("module doesn't support SFF-8079 or SFF-8472")
+	return SFF8079{}, fmt.Errorf("module doesn't support SFF-8079 or SFF-8472")
 }
 
 func (e *Ethtool) DriverInfo(intf string) (ethtoolDrvInfo, error) {

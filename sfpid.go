@@ -5,7 +5,7 @@ import (
 	"unsafe"
 )
 
-type sff8079 struct {
+type SFF8079 struct {
 	ExtIdentifier   string
 	Connector       string
 	TransCodes      string
@@ -33,12 +33,12 @@ type sff8079 struct {
 	DateCode        string
 }
 
-func ParseSFF8079(id []byte) (sff8079, error) {
+func ParseSFF8079(id []byte) (SFF8079, error) {
 	if id[0] != 0x03 && id[1] != 0x04 {
-		return sff8079{}, fmt.Errorf("unknown eeprom format, not sff-8079")
+		return SFF8079{}, fmt.Errorf("unknown eeprom format, not sff-8079")
 	}
 
-	sff := sff8079{}
+	sff := SFF8079{}
 
 	// External identifier
 	sff.ExtIdentifier = fmt.Sprintf("0x%02x ", id[1])
