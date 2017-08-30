@@ -3,35 +3,37 @@ package ethtool
 import (
 	"fmt"
 	"strings"
+	"time"
 	"unsafe"
 )
 
 type SFF8079 struct {
-	ExtIdentifier  string   `json:"extIdentifier"`
-	Connector      string   `json:"connector"`
-	TransCodes     string   `json:"transCodes"`
-	TransTypes     []string `json:"transTypes"`
-	Encoding       string   `json:"encoding"`
-	BRNominalMBd   uint     `json:"brNominalMBd"`
-	RateIdentifier string   `json:"rateIdentifier"`
-	CableSMFLenKm  uint     `json:"CableSMFLenKm"`
-	CableSMFLenM   uint     `json:"CableSMFLenM"`
-	Cable50umLenM  uint     `json:"Cable50umLenM"`
-	Cable625umLenM uint     `json:"Cable625umLenM"`
-	CableCprLenM   uint     `json:"CableCprLenM"`
-	CableOM3LenM   uint     `json:"CableOM3LenM"`
-	PasveCuCompl   string   `json:"pasveCuCompl,omitempty"`
-	ActveCuCompl   string   `json:"actveCuCompl,omitempty"`
-	LaserWaveLen   string   `json:"laserWaveLen,omitempty"`
-	VendorName     string   `json:"vendorName"`
-	VendorOUI      string   `json:"vendorOUI"`
-	VendorPN       string   `json:"vendorPN"`
-	VendorRev      string   `json:"vendorRev"`
-	OptionVals     string   `json:"optionVals"`
-	BRMargMaxPerc  uint     `json:"brMargMaxPerc"`
-	BRMargMinPerc  uint     `json:"brMargMinPerc"`
-	VendorSN       string   `json:"vendorSN"`
-	DateCode       string   `json:"dateCode"`
+	ExtIdentifier  string    `json:"extIdentifier"`
+	Connector      string    `json:"connector"`
+	TransCodes     string    `json:"transCodes"`
+	TransTypes     []string  `json:"transTypes"`
+	Encoding       string    `json:"encoding"`
+	BRNominalMBd   uint      `json:"brNominalMBd"`
+	RateIdentifier string    `json:"rateIdentifier"`
+	CableSMFLenKm  uint      `json:"CableSMFLenKm,omitempty"`
+	CableSMFLenM   uint      `json:"CableSMFLenM,omitempty"`
+	Cable50umLenM  uint      `json:"Cable50umLenM,omitempty"`
+	Cable625umLenM uint      `json:"Cable625umLenM,omitempty"`
+	CableCprLenM   uint      `json:"CableCprLenM,omitempty"`
+	CableOM3LenM   uint      `json:"CableOM3LenM,omitempty"`
+	PasveCuCompl   string    `json:"pasveCuCompl,omitempty"`
+	ActveCuCompl   string    `json:"actveCuCompl,omitempty"`
+	LaserWaveLen   string    `json:"laserWaveLen,omitempty"`
+	VendorName     string    `json:"vendorName"`
+	VendorOUI      string    `json:"vendorOUI"`
+	VendorPN       string    `json:"vendorPN"`
+	VendorRev      string    `json:"vendorRev"`
+	OptionVals     string    `json:"optionVals"`
+	BRMargMaxPerc  uint      `json:"brMargMaxPerc"`
+	BRMargMinPerc  uint      `json:"brMargMinPerc"`
+	VendorSN       string    `json:"vendorSN"`
+	VendorDate     time.Time `json:"vendorDate"`
+	DateCode       string    `json:"dateCode"`
 }
 
 func ParseSFF8079(id []byte) (*SFF8079, error) {
@@ -460,6 +462,14 @@ func ParseSFF8079(id []byte) (*SFF8079, error) {
 		sff.VendorSN += string(id[i])
 	}
 	sff.VendorSN = strings.TrimSpace(sff.VendorSN)
+
+	// Vendor Date
+	t, err := time.Parse("2006-01-02", fmt.Sprintf("20%s%s-%s%s-%s%s",
+		string(id[84]), string(id[85]), string(id[86]), string(id[87]), string(id[88]), string(id[89])))
+	if err != nil {
+		return nil, fmt.Errorf("parse date: %v", err)
+	}
+	sff.VendorDate = t
 
 	// Date code
 	for i := 84; i <= 91; i++ {
