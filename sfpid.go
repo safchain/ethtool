@@ -15,12 +15,12 @@ type SFF8079 struct {
 	Encoding       string    `json:"encoding"`
 	BRNominalMBd   uint      `json:"brNominalMBd"`
 	RateIdentifier string    `json:"rateIdentifier"`
-	CableSMFLenKm  uint      `json:"CableSMFLenKm,omitempty"`
-	CableSMFLenM   uint      `json:"CableSMFLenM,omitempty"`
-	Cable50umLenM  uint      `json:"Cable50umLenM,omitempty"`
-	Cable625umLenM uint      `json:"Cable625umLenM,omitempty"`
-	CableCprLenM   uint      `json:"CableCprLenM,omitempty"`
-	CableOM3LenM   uint      `json:"CableOM3LenM,omitempty"`
+	CableSMFLenKm  uint      `json:"cableSMFLenKm,omitempty"`
+	CableSMFLenM   uint      `json:"cableSMFLenM,omitempty"`
+	Cable50umLenM  uint      `json:"cable50umLenM,omitempty"`
+	Cable625umLenM uint      `json:"cable625umLenM,omitempty"`
+	CableCoprLenM  uint      `json:"cableCoprLenM,omitempty"`
+	CableOM3LenM   uint      `json:"cableOM3LenM,omitempty"`
 	PasveCuCompl   string    `json:"pasveCuCompl,omitempty"`
 	ActveCuCompl   string    `json:"actveCuCompl,omitempty"`
 	LaserWaveLen   string    `json:"laserWaveLen,omitempty"`
@@ -349,7 +349,7 @@ func ParseSFF8079(id []byte) (*SFF8079, error) {
 
 	// Length copper
 	v = *(*uint8)(unsafe.Pointer(&id[18]))
-	sff.CableCprLenM = uint(v)
+	sff.CableCoprLenM = uint(v)
 
 	// Length OM3
 	v = *(*uint8)(unsafe.Pointer(&id[19]))
