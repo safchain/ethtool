@@ -8,33 +8,33 @@ import (
 )
 
 type SFF8079 struct {
-	ExtIdentifier  string    `json:"extIdentifier"`
+	ExtIdentifier  string    `json:"external_identifier"`
 	Connector      string    `json:"connector"`
-	TransCodes     string    `json:"transCodes"`
-	TransTypes     []string  `json:"transTypes"`
+	TransCodes     string    `json:"transceiver_codes"`
+	TransTypes     []string  `json:"transceiver_types"`
 	Encoding       string    `json:"encoding"`
-	BRNominalMBd   uint      `json:"brNominalMBd"`
-	RateIdentifier string    `json:"rateIdentifier"`
-	CableSMFLenKm  uint      `json:"cableSMFLenKm,omitempty"`
-	CableSMFLenM   uint      `json:"cableSMFLenM,omitempty"`
-	Cable50umLenM  uint      `json:"cable50umLenM,omitempty"`
-	Cable625umLenM uint      `json:"cable625umLenM,omitempty"`
-	CableCoprLenM  uint      `json:"cableCoprLenM,omitempty"`
-	CableOM3LenM   uint      `json:"cableOM3LenM,omitempty"`
-	PasveCuCompl   string    `json:"pasveCuCompl,omitempty"`
-	ActveCuCompl   string    `json:"actveCuCompl,omitempty"`
-	LaserWaveLen   string    `json:"laserWaveLen,omitempty"`
-	VendorName     string    `json:"vendorName"`
-	VendorOUI      string    `json:"vendorOUI"`
-	VendorPN       string    `json:"vendorPN"`
-	VendorRev      string    `json:"vendorRev"`
-	OptionVals     string    `json:"optionVals"`
+	BRNominalMBd   uint      `json:"br_nominal_mbd"`
+	RateIdentifier string    `json:"rate_identifier"`
+	CableSMFLenKm  uint      `json:"cable_smf_length_km,omitempty"`
+	CableSMFLenM   uint      `json:"cable_smf_length_m,omitempty"`
+	Cable50umLenM  uint      `json:"cable_50um_length_m,omitempty"`
+	Cable625umLenM uint      `json:"cable_62_5um_length_m,omitempty"`
+	CableCoprLenM  uint      `json:"cable_copper_length_m,omitempty"`
+	CableOM3LenM   uint      `json:"cable_om3_length_m,omitempty"`
+	PasveCuCompl   string    `json:"passive_cu_compliant,omitempty"`
+	ActveCuCompl   string    `json:"active_cu_compliant,omitempty"`
+	LaserWavelen   string    `json:"laser_wavelength,omitempty"`
+	VendorName     string    `json:"vendor_name"`
+	VendorOUI      string    `json:"vendor_oui"`
+	VendorPN       string    `json:"vendor_pn"`
+	VendorRev      string    `json:"vendor_rev"`
+	OptionVals     string    `json:"option_vals"`
 	Option         string    `json:"option"`
-	BRMargMaxPerc  uint      `json:"brMargMaxPerc"`
-	BRMargMinPerc  uint      `json:"brMargMinPerc"`
-	VendorSN       string    `json:"vendorSN"`
-	VendorDate     time.Time `json:"vendorDate"`
-	DateCode       string    `json:"dateCode"`
+	BRMargMaxPerc  uint      `json:"br_margin_max_perc"`
+	BRMargMinPerc  uint      `json:"br_margin_min_perc"`
+	VendorSN       string    `json:"vendor_sn"`
+	VendorDate     time.Time `json:"vendor_date"`
+	DateCode       string    `json:"date_code"`
 }
 
 func ParseSFF8079(id []byte) (*SFF8079, error) {
@@ -384,7 +384,7 @@ func ParseSFF8079(id []byte) (*SFF8079, error) {
 		}
 		sff.ActveCuCompl += " [SFF-8472 rev10.4 only]"
 	} else {
-		sff.LaserWaveLen = fmt.Sprintf("%u%s", (id[60]<<8)|id[61], "nm")
+		sff.LaserWavelen = fmt.Sprintf("%u%s", (id[60]<<8)|id[61], "nm")
 	}
 
 	// Vendor name
