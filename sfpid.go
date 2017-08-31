@@ -29,6 +29,7 @@ type SFF8079 struct {
 	VendorPN       string    `json:"vendorPN"`
 	VendorRev      string    `json:"vendorRev"`
 	OptionVals     string    `json:"optionVals"`
+	Option         string    `json:"option"`
 	BRMargMaxPerc  uint      `json:"brMargMaxPerc"`
 	BRMargMinPerc  uint      `json:"brMargMinPerc"`
 	VendorSN       string    `json:"vendorSN"`
@@ -408,45 +409,45 @@ func ParseSFF8079(id []byte) (*SFF8079, error) {
 	sff.VendorRev = strings.TrimSpace(sff.VendorRev)
 
 	// Options values
-	sff.OptionVals = fmt.Sprintf("0x%02x 0x%02x\n", id[64], id[65])
+	sff.OptionVals = fmt.Sprintf("0x%02x 0x%02x", id[64], id[65])
 	if id[65]&(1<<1) != 0 {
-		sff.OptionVals += "RX_LOS implemented"
+		sff.Option += "RX_LOS implemented"
 	}
 	if id[65]&(1<<2) != 0 {
-		sff.OptionVals += "RX_LOS implemented, inverted"
+		sff.Option += "RX_LOS implemented, inverted"
 	}
 	if id[65]&(1<<3) != 0 {
-		sff.OptionVals += "TX_FAULT implemented"
+		sff.Option += "TX_FAULT implemented"
 	}
 	if id[65]&(1<<4) != 0 {
-		sff.OptionVals += "TX_DISABLE implemented"
+		sff.Option += "TX_DISABLE implemented"
 	}
 	if id[65]&(1<<5) != 0 {
-		sff.OptionVals += "RATE_SELECT implemented"
+		sff.Option += "RATE_SELECT implemented"
 	}
 	if id[65]&(1<<6) != 0 {
-		sff.OptionVals += "Tunable transmitter technology"
+		sff.Option += "Tunable transmitter technology"
 	}
 	if id[65]&(1<<7) != 0 {
-		sff.OptionVals += "Receiver decision threshold implemented"
+		sff.Option += "Receiver decision threshold implemented"
 	}
 	if id[64]&(1<<0) != 0 {
-		sff.OptionVals += "Linear receiver output implemented"
+		sff.Option += "Linear receiver output implemented"
 	}
 	if id[64]&(1<<1) != 0 {
-		sff.OptionVals += "Power level 2 requirement"
+		sff.Option += "Power level 2 requirement"
 	}
 	if id[64]&(1<<2) != 0 {
-		sff.OptionVals += "Cooled transceiver implemented"
+		sff.Option += "Cooled transceiver implemented"
 	}
 	if id[64]&(1<<3) != 0 {
-		sff.OptionVals += "Retimer or CDR implemented"
+		sff.Option += "Retimer or CDR implemented"
 	}
 	if id[64]&(1<<4) != 0 {
-		sff.OptionVals += "Paging implemented"
+		sff.Option += "Paging implemented"
 	}
 	if id[64]&(1<<5) != 0 {
-		sff.OptionVals += "Power level 3 requirement"
+		sff.Option += "Power level 3 requirement"
 	}
 
 	// BR margin max
