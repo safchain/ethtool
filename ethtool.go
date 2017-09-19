@@ -161,7 +161,7 @@ func (e *Ethtool) ModuleInfo(intf string) (*SFF8079, error) {
 	case ETH_MODULE_SFF_8472:
 		return ParseSFF8079(eeprom.data[:eeprom.len])
 	case ETH_MODULE_SFF_8436:
-		return ParseSFF8436(eeprom.data[:eeprom.len])
+		//		return ParseSFF8436(eeprom.data[:eeprom.len])
 	}
 
 	return nil, fmt.Errorf("module doesn't support SFF-8079, SFF-8472 or SFF-8436")
