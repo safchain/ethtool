@@ -59,13 +59,15 @@ const (
 	ETHTOOL_GMODULEEEPROM = 0x00000043 /* Get plug-in module eeprom */
 	ETH_MODULE_SFF_8079   = 0x1
 	ETH_MODULE_SFF_8472   = 0x2
+	ETH_MODULE_SFF_8636   = 0x3
+	ETH_MODULE_SFF_8436   = 0x4
 )
 
 // MAX_GSTRINGS maximum number of stats entries that ethtool can
 // retrieve currently.
 const (
 	MAX_GSTRINGS = 1000
-	EEPROM_LEN   = 500
+	EEPROM_LEN   = 640
 )
 
 type ifreq struct {
@@ -158,9 +160,11 @@ func (e *Ethtool) ModuleInfo(intf string) (*SFF8079, error) {
 		return ParseSFF8079(eeprom.data[:eeprom.len])
 	case ETH_MODULE_SFF_8472:
 		return ParseSFF8079(eeprom.data[:eeprom.len])
+	case ETH_MODULE_SFF_8436:
+		return ParseSFF8436(eeprom.data[:eeprom.len])
 	}
 
-	return nil, fmt.Errorf("module doesn't support SFF-8079 or SFF-8472")
+	return nil, fmt.Errorf("module doesn't support SFF-8079, SFF-8472 or SFF-8436")
 }
 
 func (e *Ethtool) DriverInfo(intf string) (ethtoolDrvInfo, error) {
@@ -215,6 +219,10 @@ func (e *Ethtool) getModuleEeprom(intf string) (ethtoolEeprom, ethtoolModInfo, e
 		cmd:    ETHTOOL_GMODULEEEPROM,
 		len:    modInfo.eeprom_len,
 		offset: 0,
+	}
+
+	if modInfo.eeprom_len > EEPROM_LEN {
+		return ethtoolEeprom{}, ethtoolModInfo{}, fmt.Errorf("eeprom size: %d is larger then buffer size: %d", modInfo.eeprom_len, EEPROM_LEN)
 	}
 
 	ifr.ifr_data = uintptr(unsafe.Pointer(&eeprom))
