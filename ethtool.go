@@ -140,31 +140,13 @@ func (e *Ethtool) BusInfo(intf string) (string, error) {
 	return string(bytes.Trim(info.bus_info[:], "\x00")), nil
 }
 
-func (e *Ethtool) ModuleEeprom(intf string) (string, error) {
+func (e *Ethtool) ModuleEepromHex(intf string) (string, error) {
 	eeprom, _, err := e.getModuleEeprom(intf)
 	if err != nil {
 		return "", err
 	}
 
 	return hex.EncodeToString(eeprom.data[:eeprom.len]), nil
-}
-
-func (e *Ethtool) ModuleInfo(intf string) (*SFF8079, error) {
-	eeprom, modInfo, err := e.getModuleEeprom(intf)
-	if err != nil {
-		return nil, err
-	}
-
-	switch modInfo.tpe {
-	case ETH_MODULE_SFF_8079:
-		return ParseSFF8079(eeprom.data[:eeprom.len])
-	case ETH_MODULE_SFF_8472:
-		return ParseSFF8079(eeprom.data[:eeprom.len])
-	case ETH_MODULE_SFF_8436:
-		//		return ParseSFF8436(eeprom.data[:eeprom.len])
-	}
-
-	return nil, fmt.Errorf("module doesn't support SFF-8079, SFF-8472 or SFF-8436")
 }
 
 func (e *Ethtool) DriverInfo(intf string) (ethtoolDrvInfo, error) {
