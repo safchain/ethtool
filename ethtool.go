@@ -57,10 +57,6 @@ const (
 	ETHTOOL_SMSGLVL       = 0x00000008 /* Set driver msg level. */
 	ETHTOOL_GMODULEINFO   = 0x00000042 /* Get plug-in module information */
 	ETHTOOL_GMODULEEEPROM = 0x00000043 /* Get plug-in module eeprom */
-	ETH_MODULE_SFF_8079   = 0x1
-	ETH_MODULE_SFF_8472   = 0x2
-	ETH_MODULE_SFF_8636   = 0x3
-	ETH_MODULE_SFF_8436   = 0x4
 )
 
 // MAX_GSTRINGS maximum number of stats entries that ethtool can
