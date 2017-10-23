@@ -136,6 +136,15 @@ func (e *Ethtool) BusInfo(intf string) (string, error) {
 	return string(bytes.Trim(info.bus_info[:], "\x00")), nil
 }
 
+func (e *Ethtool) ModuleEeprom(intf string) ([]byte, error) {
+	eeprom, _, err := e.getModuleEeprom(intf)
+	if err != nil {
+		return nil, err
+	}
+
+	return eeprom.data[:eeprom.len], nil
+}
+
 func (e *Ethtool) ModuleEepromHex(intf string) (string, error) {
 	eeprom, _, err := e.getModuleEeprom(intf)
 	if err != nil {
