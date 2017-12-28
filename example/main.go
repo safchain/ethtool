@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	//	"github.com/safchain/ethtool"
-	"github.com/mickep76/ethtool"
+	"github.com/safchain/ethtool"
 )
 
 func main() {

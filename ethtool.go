@@ -209,7 +209,7 @@ func (e *Ethtool) getModuleEeprom(intf string) (ethtoolEeprom, ethtoolModInfo, e
 	}
 
 	if modInfo.eeprom_len > EEPROM_LEN {
-		return ethtoolEeprom{}, ethtoolModInfo{}, fmt.Errorf("eeprom size: %d is larger then buffer size: %d", modInfo.eeprom_len, EEPROM_LEN)
+		return ethtoolEeprom{}, ethtoolModInfo{}, fmt.Errorf("eeprom size: %d is larger than buffer size: %d", modInfo.eeprom_len, EEPROM_LEN)
 	}
 
 	ifr.ifr_data = uintptr(unsafe.Pointer(&eeprom))
