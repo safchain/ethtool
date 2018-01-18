@@ -20,6 +20,7 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
+	defer e.Close()
 
 	stats, err := e.Stats(*name)
 	if err != nil {
@@ -56,6 +57,12 @@ func main() {
 		panic(err.Error())
 	}
 	fmt.Printf("drvrinfo: %+v\n", drvInfo)
+
+	permAddr, err := e.PermAddr(*name)
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Printf("permaddr: %+v\n", permAddr)
 
 	eeprom, err := e.ModuleEepromHex(*name)
 	if err != nil {
