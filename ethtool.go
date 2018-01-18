@@ -177,6 +177,12 @@ func (e *Ethtool) PermAddr(intf string) (string, error) {
 		return "", err
 	}
 
+	if permAddr.data[0] == 0 && permAddr.data[1] == 0 &&
+		permAddr.data[2] == 0 && permAddr.data[3] == 0 &&
+		permAddr.data[4] == 0 && permAddr.data[5] == 0 {
+		return "", nil
+	}
+
 	return fmt.Sprintf("%x:%x:%x:%x:%x:%x",
 		permAddr.data[0:1],
 		permAddr.data[1:2],
