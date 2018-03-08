@@ -27,6 +27,7 @@ package ethtool
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"syscall"
 	"unsafe"
@@ -50,16 +51,21 @@ const (
 	ETHTOOL_GSTRINGS = 0x0000001b
 	ETHTOOL_GSTATS   = 0x0000001d
 	// other CMDs from ethtool-copy.h of ethtool-3.5 package
-	ETHTOOL_GSET    = 0x00000001 /* Get settings. */
-	ETHTOOL_SSET    = 0x00000002 /* Set settings. */
-	ETHTOOL_GMSGLVL = 0x00000007 /* Get driver message level */
-	ETHTOOL_SMSGLVL = 0x00000008 /* Set driver msg level. */
+	ETHTOOL_GSET          = 0x00000001 /* Get settings. */
+	ETHTOOL_SSET          = 0x00000002 /* Set settings. */
+	ETHTOOL_GMSGLVL       = 0x00000007 /* Get driver message level */
+	ETHTOOL_SMSGLVL       = 0x00000008 /* Set driver msg level. */
+	ETHTOOL_GMODULEINFO   = 0x00000042 /* Get plug-in module information */
+	ETHTOOL_GMODULEEEPROM = 0x00000043 /* Get plug-in module eeprom */
+	ETHTOOL_GPERMADDR     = 0x00000020
 )
 
 // MAX_GSTRINGS maximum number of stats entries that ethtool can
 // retrieve currently.
 const (
 	MAX_GSTRINGS = 1000
+	EEPROM_LEN   = 640
+	PERMADDR_LEN = 32
 )
 
 type ifreq struct {
@@ -95,6 +101,27 @@ type ethtoolStats struct {
 	data    [MAX_GSTRINGS]uint64
 }
 
+type ethtoolEeprom struct {
+	cmd    uint32
+	magic  uint32
+	offset uint32
+	len    uint32
+	data   [EEPROM_LEN]byte
+}
+
+type ethtoolModInfo struct {
+	cmd        uint32
+	tpe        uint32
+	eeprom_len uint32
+	reserved   [8]uint32
+}
+
+type ethtoolPermAddr struct {
+	cmd  uint32
+	size uint32
+	data [PERMADDR_LEN]byte
+}
+
 type Ethtool struct {
 	fd int
 }
@@ -117,6 +144,55 @@ func (e *Ethtool) BusInfo(intf string) (string, error) {
 	return string(bytes.Trim(info.bus_info[:], "\x00")), nil
 }
 
+func (e *Ethtool) ModuleEeprom(intf string) ([]byte, error) {
+	eeprom, _, err := e.getModuleEeprom(intf)
+	if err != nil {
+		return nil, err
+	}
+
+	return eeprom.data[:eeprom.len], nil
+}
+
+func (e *Ethtool) ModuleEepromHex(intf string) (string, error) {
+	eeprom, _, err := e.getModuleEeprom(intf)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(eeprom.data[:eeprom.len]), nil
+}
+
+func (e *Ethtool) DriverInfo(intf string) (ethtoolDrvInfo, error) {
+	drvInfo, err := e.getDriverInfo(intf)
+	if err != nil {
+		return ethtoolDrvInfo{}, err
+	}
+
+	return drvInfo, nil
+}
+
+func (e *Ethtool) PermAddr(intf string) (string, error) {
+	permAddr, err := e.getPermAddr(intf)
+	if err != nil {
+		return "", err
+	}
+
+	if permAddr.data[0] == 0 && permAddr.data[1] == 0 &&
+		permAddr.data[2] == 0 && permAddr.data[3] == 0 &&
+		permAddr.data[4] == 0 && permAddr.data[5] == 0 {
+		return "", nil
+	}
+
+	return fmt.Sprintf("%x:%x:%x:%x:%x:%x",
+		permAddr.data[0:1],
+		permAddr.data[1:2],
+		permAddr.data[2:3],
+		permAddr.data[3:4],
+		permAddr.data[4:5],
+		permAddr.data[5:6],
+	), nil
+}
+
 func (e *Ethtool) getDriverInfo(intf string) (ethtoolDrvInfo, error) {
 	drvinfo := ethtoolDrvInfo{
 		cmd: ETHTOOL_GDRVINFO,
@@ -136,6 +212,66 @@ func (e *Ethtool) getDriverInfo(intf string) (ethtoolDrvInfo, error) {
 	}
 
 	return drvinfo, nil
+}
+
+func (e *Ethtool) getPermAddr(intf string) (ethtoolPermAddr, error) {
+	permAddr := ethtoolPermAddr{
+		cmd:  ETHTOOL_GPERMADDR,
+		size: PERMADDR_LEN,
+	}
+
+	var name [IFNAMSIZ]byte
+	copy(name[:], []byte(intf))
+
+	ifr := ifreq{
+		ifr_name: name,
+		ifr_data: uintptr(unsafe.Pointer(&permAddr)),
+	}
+
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+	if ep != 0 {
+		return ethtoolPermAddr{}, syscall.Errno(ep)
+	}
+
+	return permAddr, nil
+}
+
+func (e *Ethtool) getModuleEeprom(intf string) (ethtoolEeprom, ethtoolModInfo, error) {
+	modInfo := ethtoolModInfo{
+		cmd: ETHTOOL_GMODULEINFO,
+	}
+
+	var name [IFNAMSIZ]byte
+	copy(name[:], []byte(intf))
+
+	ifr := ifreq{
+		ifr_name: name,
+		ifr_data: uintptr(unsafe.Pointer(&modInfo)),
+	}
+
+	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+	if ep != 0 {
+		return ethtoolEeprom{}, ethtoolModInfo{}, syscall.Errno(ep)
+	}
+
+	eeprom := ethtoolEeprom{
+		cmd:    ETHTOOL_GMODULEEEPROM,
+		len:    modInfo.eeprom_len,
+		offset: 0,
+	}
+
+	if modInfo.eeprom_len > EEPROM_LEN {
+		return ethtoolEeprom{}, ethtoolModInfo{}, fmt.Errorf("eeprom size: %d is larger than buffer size: %d", modInfo.eeprom_len, EEPROM_LEN)
+	}
+
+	ifr.ifr_data = uintptr(unsafe.Pointer(&eeprom))
+
+	_, _, ep = syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+	if ep != 0 {
+		return ethtoolEeprom{}, ethtoolModInfo{}, syscall.Errno(ep)
+	}
+
+	return eeprom, modInfo, nil
 }
 
 // Stats retrieves stats of the given interface name.
@@ -237,4 +373,13 @@ func Stats(intf string) (map[string]uint64, error) {
 	}
 	defer e.Close()
 	return e.Stats(intf)
+}
+
+func PermAddr(intf string) (string, error) {
+	e, err := NewEthtool()
+	if err != nil {
+		return "", err
+	}
+	defer e.Close()
+	return e.PermAddr(intf)
 }
