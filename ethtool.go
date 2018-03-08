@@ -202,9 +202,9 @@ func (e *Ethtool) Close() {
 }
 
 func NewEthtool() (*Ethtool, error) {
-	fd, _, err := syscall.RawSyscall(syscall.SYS_SOCKET, syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_IP)
-	if err != 0 {
-		return nil, syscall.Errno(err)
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_IP)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Ethtool{
