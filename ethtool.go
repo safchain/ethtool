@@ -306,19 +306,19 @@ func (e *Ethtool) Features(intf string) (map[string]bool, error) {
 		return nil, err
 	}
 
-	len := uint32(ssetInfo.data)
-	if len == 0 {
+	length := uint32(ssetInfo.data)
+	if length == 0 {
 		return nil, nil
 	}
 
-	if len*ETH_GSTRING_LEN > MAX_GSTRINGS*ETH_GSTRING_LEN {
-		return nil, fmt.Errorf("ethtool currently doesn't support more than %d entries, received %d", MAX_GSTRINGS, len)
+	if length*ETH_GSTRING_LEN > MAX_GSTRINGS*ETH_GSTRING_LEN {
+		return nil, fmt.Errorf("ethtool currently doesn't support more than %d entries, received %d", MAX_GSTRINGS, length)
 	}
 
 	gstrings := ethtoolGStrings{
 		cmd:        ETHTOOL_GSTRINGS,
 		string_set: ETH_SS_FEATURES,
-		len:        len,
+		len:        length,
 		data:       [MAX_GSTRINGS * ETH_GSTRING_LEN]byte{},
 	}
 
@@ -328,7 +328,7 @@ func (e *Ethtool) Features(intf string) (map[string]bool, error) {
 
 	features := ethtoolGfeatures{
 		cmd:  ETHTOOL_GFEATURES,
-		size: (len + 32 - 1) / 32,
+		size: (length + 32 - 1) / 32,
 	}
 
 	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&features))); err != nil {
@@ -336,10 +336,12 @@ func (e *Ethtool) Features(intf string) (map[string]bool, error) {
 	}
 
 	var result = make(map[string]bool)
-	for i := 0; i != int(len); i++ {
+	for i := 0; i != int(length); i++ {
 		b := gstrings.data[i*ETH_GSTRING_LEN : i*ETH_GSTRING_LEN+ETH_GSTRING_LEN]
 		key := string(bytes.Trim(b, "\x00"))
-		result[key] = isFeatureBitSet(features.blocks, uint(i))
+		if len(key) != 0 {
+			result[key] = isFeatureBitSet(features.blocks, uint(i))
+		}
 	}
 
 	return result, nil
@@ -384,7 +386,9 @@ func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
 	for i := 0; i != int(drvinfo.n_stats); i++ {
 		b := gstrings.data[i*ETH_GSTRING_LEN : i*ETH_GSTRING_LEN+ETH_GSTRING_LEN]
 		key := string(bytes.Trim(b, "\x00"))
-		result[key] = stats.data[i]
+		if len(key) != 0 {
+			result[key] = stats.data[i]
+		}
 	}
 
 	return result, nil
