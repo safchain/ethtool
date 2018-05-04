@@ -22,6 +22,12 @@ func main() {
 	}
 	defer e.Close()
 
+	features, err := e.Features(*name)
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Printf("features: %+v\n", features)
+
 	stats, err := e.Stats(*name)
 	if err != nil {
 		panic(err.Error())
