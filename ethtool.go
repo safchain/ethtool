@@ -60,6 +60,7 @@ const (
 	ETHTOOL_GMODULEEEPROM = 0x00000043 /* Get plug-in module eeprom */
 	ETHTOOL_GPERMADDR     = 0x00000020
 	ETHTOOL_GFEATURES     = 0x0000003a /* Get device offload settings */
+	ETHTOOL_SFEATURES     = 0x0000003b /* Change device offload settings */
 	ETHTOOL_GFLAGS        = 0x00000025 /* Get flags bitmap(ethtool_value) */
 	ETHTOOL_GSSET_INFO    = 0x00000037 /* Get string set info */
 )
@@ -97,6 +98,17 @@ type ethtoolGfeatures struct {
 	cmd    uint32
 	size   uint32
 	blocks [MAX_FEATURE_BLOCKS]ethtoolGetFeaturesBlock
+}
+
+type ethtoolSetFeaturesBlock struct {
+	valid     uint32
+	requested uint32
+}
+
+type ethtoolSfeatures struct {
+	cmd    uint32
+	size   uint32
+	blocks [MAX_FEATURE_BLOCKS]ethtoolSetFeaturesBlock
 }
 
 type ethtoolDrvInfo struct {
@@ -295,8 +307,20 @@ func isFeatureBitSet(blocks [MAX_FEATURE_BLOCKS]ethtoolGetFeaturesBlock, index u
 	return (blocks)[index/32].active&(1<<(index%32)) != 0
 }
 
-// Features retrieves features of the given interface name.
-func (e *Ethtool) Features(intf string) (map[string]bool, error) {
+func setFeatureBit(blocks *[MAX_FEATURE_BLOCKS]ethtoolSetFeaturesBlock, index uint, value bool) {
+	blockIndex, bitIndex := index/32, index%32
+
+	blocks[blockIndex].valid |= 1 << bitIndex
+
+	if value {
+		blocks[blockIndex].requested |= 1 << bitIndex
+	} else {
+		blocks[blockIndex].requested &= ^(1 << bitIndex)
+	}
+}
+
+// FeatureNames shows supported features by their name.
+func (e *Ethtool) FeatureNames(intf string) (map[string]uint, error) {
 	ssetInfo := ethtoolSsetInfo{
 		cmd:       ETHTOOL_GSSET_INFO,
 		sset_mask: 1 << ETH_SS_FEATURES,
@@ -308,10 +332,8 @@ func (e *Ethtool) Features(intf string) (map[string]bool, error) {
 
 	length := uint32(ssetInfo.data)
 	if length == 0 {
-		return nil, nil
-	}
-
-	if length*ETH_GSTRING_LEN > MAX_GSTRINGS*ETH_GSTRING_LEN {
+		return map[string]uint{}, nil
+	} else if length > MAX_GSTRINGS {
 		return nil, fmt.Errorf("ethtool currently doesn't support more than %d entries, received %d", MAX_GSTRINGS, length)
 	}
 
@@ -326,6 +348,30 @@ func (e *Ethtool) Features(intf string) (map[string]bool, error) {
 		return nil, err
 	}
 
+	var result = make(map[string]uint)
+	for i := 0; i != int(length); i++ {
+		b := gstrings.data[i*ETH_GSTRING_LEN : i*ETH_GSTRING_LEN+ETH_GSTRING_LEN]
+		key := string(bytes.Trim(b, "\x00"))
+		if key != "" {
+			result[key] = uint(i)
+		}
+	}
+
+	return result, nil
+}
+
+// Features retrieves features of the given interface name.
+func (e *Ethtool) Features(intf string) (map[string]bool, error) {
+	names, err := e.FeatureNames(intf)
+	if err != nil {
+		return nil, err
+	}
+
+	length := uint32(len(names))
+	if length == 0 {
+		return map[string]bool{}, nil
+	}
+
 	features := ethtoolGfeatures{
 		cmd:  ETHTOOL_GFEATURES,
 		size: (length + 32 - 1) / 32,
@@ -335,16 +381,37 @@ func (e *Ethtool) Features(intf string) (map[string]bool, error) {
 		return nil, err
 	}
 
-	var result = make(map[string]bool)
-	for i := 0; i != int(length); i++ {
-		b := gstrings.data[i*ETH_GSTRING_LEN : i*ETH_GSTRING_LEN+ETH_GSTRING_LEN]
-		key := string(bytes.Trim(b, "\x00"))
-		if len(key) != 0 {
-			result[key] = isFeatureBitSet(features.blocks, uint(i))
-		}
+	var result = make(map[string]bool, length)
+	for key, index := range names {
+		result[key] = isFeatureBitSet(features.blocks, index)
 	}
 
 	return result, nil
+}
+
+// Change requests a change in the given device's features.
+func (e *Ethtool) Change(intf string, config map[string]bool) error {
+	names, err := e.FeatureNames(intf)
+	if err != nil {
+		return err
+	}
+
+	length := uint32(len(names))
+
+	features := ethtoolSfeatures{
+		cmd:  ETHTOOL_SFEATURES,
+		size: (length + 32 - 1) / 32,
+	}
+
+	for key, value := range config {
+		if index, ok := names[key]; ok {
+			setFeatureBit(&features.blocks, index, value)
+		} else {
+			return fmt.Errorf("unsupported feature %q", key)
+		}
+	}
+
+	return e.ioctl(intf, uintptr(unsafe.Pointer(&features)))
 }
 
 // Stats retrieves stats of the given interface name.
