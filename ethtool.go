@@ -56,6 +56,9 @@ const (
 	ETHTOOL_SSET          = 0x00000002 /* Set settings. */
 	ETHTOOL_GMSGLVL       = 0x00000007 /* Get driver message level */
 	ETHTOOL_SMSGLVL       = 0x00000008 /* Set driver msg level. */
+	/* Get link status for host, i.e. whether the interface *and* the
+ * physical port (if there is one) are up (ethtool_value). */
+	ETHTOOL_GLINK         = 0x0000000a
 	ETHTOOL_GMODULEINFO   = 0x00000042 /* Get plug-in module information */
 	ETHTOOL_GMODULEEEPROM = 0x00000043 /* Get plug-in module eeprom */
 	ETHTOOL_GPERMADDR     = 0x00000020
@@ -152,6 +155,11 @@ type ethtoolModInfo struct {
 	tpe        uint32
 	eeprom_len uint32
 	reserved   [8]uint32
+}
+
+type ethtoolLink struct {
+	cmd        uint32
+	data       uint32
 }
 
 type ethtoolPermAddr struct {
@@ -412,6 +420,19 @@ func (e *Ethtool) Change(intf string, config map[string]bool) error {
 	}
 
 	return e.ioctl(intf, uintptr(unsafe.Pointer(&features)))
+}
+
+// Get state of a link. 
+func (e *Ethtool) LinkState(intf string) (uint32, error) {
+	x := ethtoolLink{
+		cmd: ETHTOOL_GLINK,
+	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&x))); err != nil {
+		return 0, err
+	}
+
+	return x.data, nil
 }
 
 // Stats retrieves stats of the given interface name.
