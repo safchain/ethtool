@@ -53,12 +53,14 @@ const (
 	ETHTOOL_GSTRINGS = 0x0000001b
 	ETHTOOL_GSTATS   = 0x0000001d
 	// other CMDs from ethtool-copy.h of ethtool-3.5 package
-	ETHTOOL_GSET          = 0x00000001 /* Get settings. */
-	ETHTOOL_SSET          = 0x00000002 /* Set settings. */
-	ETHTOOL_GMSGLVL       = 0x00000007 /* Get driver message level */
-	ETHTOOL_SMSGLVL       = 0x00000008 /* Set driver msg level. */
+	ETHTOOL_GSET      = 0x00000001 /* Get settings. */
+	ETHTOOL_SSET      = 0x00000002 /* Set settings. */
+	ETHTOOL_GMSGLVL   = 0x00000007 /* Get driver message level */
+	ETHTOOL_SMSGLVL   = 0x00000008 /* Set driver msg level. */
+	ETHTOOL_GCHANNELS = 0x0000003c /* Get no of channels */
+	ETHTOOL_GCOALESCE = 0x0000000e /* Get coalesce config */
 	/* Get link status for host, i.e. whether the interface *and* the
- * physical port (if there is one) are up (ethtool_value). */
+	 * physical port (if there is one) are up (ethtool_value). */
 	ETHTOOL_GLINK         = 0x0000000a
 	ETHTOOL_GMODULEINFO   = 0x00000042 /* Get plug-in module information */
 	ETHTOOL_GMODULEEEPROM = 0x00000043 /* Get plug-in module eeprom */
@@ -130,6 +132,46 @@ type ethtoolDrvInfo struct {
 	regdump_len  uint32
 }
 
+// Channels contains the number of channels for a given interface.
+type Channels struct {
+	Cmd           uint32
+	MaxRx         uint32
+	MaxTx         uint32
+	MaxOther      uint32
+	MaxCombined   uint32
+	RxCount       uint32
+	TxCount       uint32
+	OtherCount    uint32
+	CombinedCount uint32
+}
+
+// Coalesce is a coalesce config for an interface
+type Coalesce struct {
+	Cmd                      uint32
+	RxCoalesceUsecs          uint32
+	RxMaxCoalescedFrames     uint32
+	RxCoalesceUsecsIrq       uint32
+	RxMaxCoalescedFramesIrq  uint32
+	TxCoalesceUsecs          uint32
+	TxMaxCoalescedFrames     uint32
+	TxCoalesceUsecsIrq       uint32
+	TxMaxCoalescedFramesIrq  uint32
+	StatsBlockCoalesceUsecs  uint32
+	UseAdaptiveRxCoalesce    uint32
+	UseAdaptiveTxCoalesce    uint32
+	PktRateLow               uint32
+	RxCoalesceUsecsLow       uint32
+	RxMaxCoalescedFramesLow  uint32
+	TxCoalesceUsecsLow       uint32
+	TxMaxCoalescedFramesLow  uint32
+	PktRateHigh              uint32
+	RxCoalesceUsecsHigh      uint32
+	RxMaxCoalescedFramesHigh uint32
+	TxCoalesceUsecsHigh      uint32
+	TxMaxCoalescedFramesHigh uint32
+	RateSampleInterval       uint32
+}
+
 type ethtoolGStrings struct {
 	cmd        uint32
 	string_set uint32
@@ -159,8 +201,8 @@ type ethtoolModInfo struct {
 }
 
 type ethtoolLink struct {
-	cmd        uint32
-	data       uint32
+	cmd  uint32
+	data uint32
 }
 
 type ethtoolPermAddr struct {
@@ -221,6 +263,25 @@ func (e *Ethtool) DriverInfo(intf string) (ethtoolDrvInfo, error) {
 	return drvInfo, nil
 }
 
+// GetChannels returns the number of channels for the given interface name.
+func (e *Ethtool) GetChannels(intf string) (Channels, error) {
+	channels, err := e.getChannels(intf)
+	if err != nil {
+		return Channels{}, err
+	}
+
+	return channels, nil
+}
+
+// GetCoalesce returns the coalesce config for the given interface name.
+func (e *Ethtool) GetCoalesce(intf string) (Coalesce, error) {
+	coalesce, err := e.getCoalesce(intf)
+	if err != nil {
+		return Coalesce{}, err
+	}
+	return coalesce, nil
+}
+
 // PermAddr returns permanent address of the given interface name.
 func (e *Ethtool) PermAddr(intf string) (string, error) {
 	permAddr, err := e.getPermAddr(intf)
@@ -271,6 +332,30 @@ func (e *Ethtool) getDriverInfo(intf string) (ethtoolDrvInfo, error) {
 	}
 
 	return drvinfo, nil
+}
+
+func (e *Ethtool) getChannels(intf string) (Channels, error) {
+	channels := Channels{
+		Cmd: ETHTOOL_GCHANNELS,
+	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&channels))); err != nil {
+		return Channels{}, err
+	}
+
+	return channels, nil
+}
+
+func (e *Ethtool) getCoalesce(intf string) (Coalesce, error) {
+	coalesce := Coalesce{
+		Cmd: ETHTOOL_GCOALESCE,
+	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&coalesce))); err != nil {
+		return Coalesce{}, err
+	}
+
+	return coalesce, nil
 }
 
 func (e *Ethtool) getPermAddr(intf string) (ethtoolPermAddr, error) {
@@ -423,7 +508,7 @@ func (e *Ethtool) Change(intf string, config map[string]bool) error {
 	return e.ioctl(intf, uintptr(unsafe.Pointer(&features)))
 }
 
-// Get state of a link. 
+// Get state of a link.
 func (e *Ethtool) LinkState(intf string) (uint32, error) {
 	x := ethtoolLink{
 		cmd: ETHTOOL_GLINK,
