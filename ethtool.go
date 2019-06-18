@@ -117,19 +117,21 @@ type ethtoolSfeatures struct {
 	blocks [MAX_FEATURE_BLOCKS]ethtoolSetFeaturesBlock
 }
 
-type ethtoolDrvInfo struct {
-	cmd          uint32
-	driver       [32]byte
-	version      [32]byte
-	fw_version   [32]byte
-	bus_info     [32]byte
-	erom_version [32]byte
-	reserved2    [12]byte
-	n_priv_flags uint32
-	n_stats      uint32
-	testinfo_len uint32
-	eedump_len   uint32
-	regdump_len  uint32
+// DrvInfo contains driver information
+// ethtool.h v3.5: struct ethtool_drvinfo
+type DrvInfo struct {
+	Cmd         uint32
+	Driver      [32]byte
+	Version     [32]byte
+	FwVersion   [32]byte
+	BusInfo     [32]byte
+	EromVersion [32]byte
+	Reserved2   [12]byte
+	NPrivFlags  uint32
+	NStats      uint32
+	TestInfoLen uint32
+	EedumpLen   uint32
+	RegdumpLen  uint32
 }
 
 // Channels contains the number of channels for a given interface.
@@ -221,7 +223,7 @@ func (e *Ethtool) DriverName(intf string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(bytes.Trim(info.driver[:], "\x00")), nil
+	return string(bytes.Trim(info.Driver[:], "\x00")), nil
 }
 
 // BusInfo returns the bus information of the given interface name.
@@ -230,7 +232,7 @@ func (e *Ethtool) BusInfo(intf string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(bytes.Trim(info.bus_info[:], "\x00")), nil
+	return string(bytes.Trim(info.BusInfo[:], "\x00")), nil
 }
 
 // ModuleEeprom returns Eeprom information of the given interface name.
@@ -254,10 +256,10 @@ func (e *Ethtool) ModuleEepromHex(intf string) (string, error) {
 }
 
 // DriverInfo returns driver information of the given interface name.
-func (e *Ethtool) DriverInfo(intf string) (ethtoolDrvInfo, error) {
+func (e *Ethtool) DriverInfo(intf string) (DrvInfo, error) {
 	drvInfo, err := e.getDriverInfo(intf)
 	if err != nil {
-		return ethtoolDrvInfo{}, err
+		return DrvInfo{}, err
 	}
 
 	return drvInfo, nil
@@ -322,13 +324,13 @@ func (e *Ethtool) ioctl(intf string, data uintptr) error {
 	return nil
 }
 
-func (e *Ethtool) getDriverInfo(intf string) (ethtoolDrvInfo, error) {
-	drvinfo := ethtoolDrvInfo{
-		cmd: ETHTOOL_GDRVINFO,
+func (e *Ethtool) getDriverInfo(intf string) (DrvInfo, error) {
+	drvinfo := DrvInfo{
+		Cmd: ETHTOOL_GDRVINFO,
 	}
 
 	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&drvinfo))); err != nil {
-		return ethtoolDrvInfo{}, err
+		return DrvInfo{}, err
 	}
 
 	return drvinfo, nil
@@ -523,22 +525,22 @@ func (e *Ethtool) LinkState(intf string) (uint32, error) {
 
 // Stats retrieves stats of the given interface name.
 func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
-	drvinfo := ethtoolDrvInfo{
-		cmd: ETHTOOL_GDRVINFO,
+	drvinfo := DrvInfo{
+		Cmd: ETHTOOL_GDRVINFO,
 	}
 
 	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&drvinfo))); err != nil {
 		return nil, err
 	}
 
-	if drvinfo.n_stats*ETH_GSTRING_LEN > MAX_GSTRINGS*ETH_GSTRING_LEN {
-		return nil, fmt.Errorf("ethtool currently doesn't support more than %d entries, received %d", MAX_GSTRINGS, drvinfo.n_stats)
+	if drvinfo.NStats*ETH_GSTRING_LEN > MAX_GSTRINGS*ETH_GSTRING_LEN {
+		return nil, fmt.Errorf("ethtool currently doesn't support more than %d entries, received %d", MAX_GSTRINGS, drvinfo.NStats)
 	}
 
 	gstrings := ethtoolGStrings{
 		cmd:        ETHTOOL_GSTRINGS,
 		string_set: ETH_SS_STATS,
-		len:        drvinfo.n_stats,
+		len:        drvinfo.NStats,
 		data:       [MAX_GSTRINGS * ETH_GSTRING_LEN]byte{},
 	}
 
@@ -548,7 +550,7 @@ func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
 
 	stats := ethtoolStats{
 		cmd:     ETHTOOL_GSTATS,
-		n_stats: drvinfo.n_stats,
+		n_stats: drvinfo.NStats,
 		data:    [MAX_GSTRINGS]uint64{},
 	}
 
@@ -557,7 +559,7 @@ func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
 	}
 
 	var result = make(map[string]uint64)
-	for i := 0; i != int(drvinfo.n_stats); i++ {
+	for i := 0; i != int(drvinfo.NStats); i++ {
 		b := gstrings.data[i*ETH_GSTRING_LEN : i*ETH_GSTRING_LEN+ETH_GSTRING_LEN]
 		key := string(b[:strings.Index(string(b), "\x00")])
 		if len(key) != 0 {
