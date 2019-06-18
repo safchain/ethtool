@@ -30,8 +30,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // Maximum size of an interface name
@@ -316,9 +317,9 @@ func (e *Ethtool) ioctl(intf string, data uintptr) error {
 		ifr_data: data,
 	}
 
-	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, uintptr(e.fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd), SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
-		return syscall.Errno(ep)
+		return ep
 	}
 
 	return nil
@@ -572,12 +573,12 @@ func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
 
 // Close closes the ethool handler
 func (e *Ethtool) Close() {
-	syscall.Close(e.fd)
+	unix.Close(e.fd)
 }
 
 // NewEthtool returns a new ethtool handler
 func NewEthtool() (*Ethtool, error) {
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, syscall.IPPROTO_IP)
+	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, unix.IPPROTO_IP)
 	if err != nil {
 		return nil, err
 	}
