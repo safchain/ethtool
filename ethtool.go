@@ -234,6 +234,11 @@ type Ethtool struct {
 	fd int
 }
 
+type keyValue struct {
+	Key   string
+	Value uint64
+}
+
 // DriverName returns the driver name of the given interface name.
 func (e *Ethtool) DriverName(intf string) (string, error) {
 	info, err := e.getDriverInfo(intf)
@@ -577,7 +582,7 @@ func (e *Ethtool) LinkState(intf string) (uint32, error) {
 }
 
 // Stats retrieves stats of the given interface name.
-func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
+func (e *Ethtool) Stats(intf string) ([]*keyValue, error) {
 	drvinfo := ethtoolDrvInfo{
 		cmd: ETHTOOL_GDRVINFO,
 	}
@@ -611,16 +616,23 @@ func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
 		return nil, err
 	}
 
-	var result = make(map[string]uint64)
+	// var result = make(map[string]uint64)
+	result := []*keyValue{}
+
 	for i := 0; i != int(drvinfo.n_stats); i++ {
 		b := gstrings.data[i*ETH_GSTRING_LEN : i*ETH_GSTRING_LEN+ETH_GSTRING_LEN]
+		// key := string(b[:strings.Index(string(b), "\x00")])
 		strEnd := strings.Index(string(b), "\x00")
 		if strEnd == -1 {
 			strEnd = ETH_GSTRING_LEN
 		}
 		key := string(b[:strEnd])
 		if len(key) != 0 {
-			result[key] = stats.data[i]
+			// result[key] = stats.data[i]
+			keval := new(keyValue)
+			keval.Key = key
+			keval.Value = stats.data[i]
+			result = append(result, keval)
 		}
 	}
 
@@ -665,7 +677,7 @@ func DriverName(intf string) (string, error) {
 }
 
 // Stats retrieves stats of the given interface name.
-func Stats(intf string) (map[string]uint64, error) {
+func Stats(intf string) ([]*keyValue, error) {
 	e, err := NewEthtool()
 	if err != nil {
 		return nil, err
