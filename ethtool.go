@@ -616,19 +616,15 @@ func (e *Ethtool) Stats(intf string) ([]*keyValue, error) {
 		return nil, err
 	}
 
-	// var result = make(map[string]uint64)
 	result := []*keyValue{}
-
 	for i := 0; i != int(drvinfo.n_stats); i++ {
 		b := gstrings.data[i*ETH_GSTRING_LEN : i*ETH_GSTRING_LEN+ETH_GSTRING_LEN]
-		// key := string(b[:strings.Index(string(b), "\x00")])
 		strEnd := strings.Index(string(b), "\x00")
 		if strEnd == -1 {
 			strEnd = ETH_GSTRING_LEN
 		}
 		key := string(b[:strEnd])
 		if len(key) != 0 {
-			// result[key] = stats.data[i]
 			keval := new(keyValue)
 			keval.Key = key
 			keval.Value = stats.data[i]
