@@ -47,12 +47,13 @@ const (
 
 // ethtool stats related constants.
 const (
-	ETH_GSTRING_LEN  = 32
-	ETH_SS_STATS     = 1
-	ETH_SS_FEATURES  = 4
-	ETHTOOL_GDRVINFO = 0x00000003
-	ETHTOOL_GSTRINGS = 0x0000001b
-	ETHTOOL_GSTATS   = 0x0000001d
+	ETH_GSTRING_LEN   = 32
+	ETH_SS_STATS      = 1
+	ETH_SS_PRIV_FLAGS = 2
+	ETH_SS_FEATURES   = 4
+	ETHTOOL_GDRVINFO  = 0x00000003
+	ETHTOOL_GSTRINGS  = 0x0000001b
+	ETHTOOL_GSTATS    = 0x0000001d
 	// other CMDs from ethtool-copy.h of ethtool-3.5 package
 	ETHTOOL_GSET      = 0x00000001 /* Get settings. */
 	ETHTOOL_SSET      = 0x00000002 /* Set settings. */
@@ -71,6 +72,9 @@ const (
 	ETHTOOL_SFEATURES     = 0x0000003b /* Change device offload settings */
 	ETHTOOL_GFLAGS        = 0x00000025 /* Get flags bitmap(ethtool_value) */
 	ETHTOOL_GSSET_INFO    = 0x00000037 /* Get string set info */
+
+	ETHTOOL_GPFLAGS = 0x00000027 /* Get driver-private flags bitmap */
+	ETHTOOL_SPFLAGS = 0x00000028 /* Set driver-private flags bitmap */
 )
 
 // MAX_GSTRINGS maximum number of stats entries that ethtool can
@@ -468,11 +472,11 @@ func setFeatureBit(blocks *[MAX_FEATURE_BLOCKS]ethtoolSetFeaturesBlock, index ui
 	}
 }
 
-// FeatureNames shows supported features by their name.
-func (e *Ethtool) FeatureNames(intf string) (map[string]uint, error) {
+func (e *Ethtool) getStringset(intf string, setID uint32) (map[string]uint, error) {
+
 	ssetInfo := ethtoolSsetInfo{
 		cmd:       ETHTOOL_GSSET_INFO,
-		sset_mask: 1 << ETH_SS_FEATURES,
+		sset_mask: 1 << setID,
 	}
 
 	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&ssetInfo))); err != nil {
@@ -488,7 +492,7 @@ func (e *Ethtool) FeatureNames(intf string) (map[string]uint, error) {
 
 	gstrings := ethtoolGStrings{
 		cmd:        ETHTOOL_GSTRINGS,
-		string_set: ETH_SS_FEATURES,
+		string_set: setID,
 		len:        length,
 		data:       [MAX_GSTRINGS * ETH_GSTRING_LEN]byte{},
 	}
@@ -505,8 +509,12 @@ func (e *Ethtool) FeatureNames(intf string) (map[string]uint, error) {
 			result[key] = uint(i)
 		}
 	}
-
 	return result, nil
+}
+
+// FeatureNames shows supported features by their name.
+func (e *Ethtool) FeatureNames(intf string) (map[string]uint, error) {
+	return e.getStringset(intf, ETH_SS_FEATURES)
 }
 
 // Features retrieves features of the given interface name.
@@ -561,6 +569,64 @@ func (e *Ethtool) Change(intf string, config map[string]bool) error {
 	}
 
 	return e.ioctl(intf, uintptr(unsafe.Pointer(&features)))
+}
+
+// PrivateFlagNames get driver private flag names (and offset).
+func (e *Ethtool) PrivateFlagNames(intf string) (map[string]uint, error) {
+	return e.getStringset(intf, ETH_SS_PRIV_FLAGS)
+}
+
+// PrivateFlags get private flag settings.
+func (e *Ethtool) PrivateFlags(intf string) (map[string]bool, error) {
+	names, err := e.PrivateFlagNames(intf)
+	if err != nil {
+		return nil, err
+	}
+
+	flags := ethtoolValue{
+		cmd: ETHTOOL_GPFLAGS,
+	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&flags))); err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]bool, len(names))
+	for k, v := range names {
+		result[k] = flags.data&(1<<v) != 0
+	}
+	return result, nil
+}
+
+// ChangePrivateFlags change specified private flags.
+func (e *Ethtool) ChangePrivateFlags(intf string, changes map[string]bool) error {
+	names, err := e.PrivateFlagNames(intf)
+	if err != nil {
+		return err
+	}
+
+	flags := ethtoolValue{
+		cmd: ETHTOOL_GPFLAGS,
+	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&flags))); err != nil {
+		return err
+	}
+
+	for k, v := range changes {
+		offset, ok := names[k]
+		if !ok {
+			return fmt.Errorf("Unknown private flag: %s", k)
+		}
+		if !v {
+			flags.data &= ^(1 << offset)
+		} else {
+			flags.data |= (1 << offset)
+		}
+	}
+
+	flags.cmd = ETHTOOL_SPFLAGS
+	return e.ioctl(intf, uintptr(unsafe.Pointer(&flags)))
 }
 
 // Get state of a link.
