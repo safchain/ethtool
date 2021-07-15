@@ -26,6 +26,21 @@ import (
 	"testing"
 )
 
+func TestGoString(t *testing.T) {
+	testcases := map[string][]byte{
+		"":      []byte{},
+		"0.5-4": []byte{48, 46, 53, 45, 52, 0, 0, 0},
+		"1.6":   []byte{49, 46, 54, 0, 46, 48, 45, 50, 50, 45, 103, 101, 110, 101, 114, 105, 99},
+	}
+
+	for want, s := range testcases {
+		got := goString(s[:])
+		if got != want {
+			t.Errorf("String conversion failed, got: %s, want: %s.", got, want)
+		}
+	}
+}
+
 func TestStats(t *testing.T) {
 	intfs, err := net.Interfaces()
 	if err != nil {
