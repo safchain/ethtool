@@ -708,7 +708,8 @@ func PermAddr(intf string) (string, error) {
 	return e.PermAddr(intf)
 }
 
-func SupportedReadable(mask uint64) []string {
+// SupportedLinkModes returns the names of the link modes supported by the interface.
+func SupportedLinkModes(mask uint64) []string {
 	ret := make([]string, 0)
 	for _, mode := range SupportedCapacities {
 		if mode.mask&mask != 0 {
@@ -718,6 +719,7 @@ func SupportedReadable(mask uint64) []string {
 	return ret
 }
 
+// SupportedMaxCapacity return the maximum capacity of this interface.
 func SupportedMaxCapacity(mask uint64) uint64 {
 	ret := uint64(0)
 	for _, mode := range SupportedCapacities {
