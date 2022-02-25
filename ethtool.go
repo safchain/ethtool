@@ -717,3 +717,13 @@ func SupportedReadable(mask uint64) []string {
 	}
 	return ret
 }
+
+func SupportedMaxCapacity(mask uint64) uint64 {
+	ret := uint64(0)
+	for _, mode := range SupportedCapacities {
+		if mode.mask&mask != 0 {
+			ret = mode.capacity
+		}
+	}
+	return ret
+}
