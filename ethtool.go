@@ -82,6 +82,21 @@ const (
 	PERMADDR_LEN       = 32
 )
 
+// see https://github.com/lyonel/lshw/blob/fdab06ac0b190ea0aa02cd468f904ed69ce0d9f1/src/core/network.cc#L113
+var SupportedCapacities = []struct {
+	name     string
+	mask     uint64
+	capacity uint64
+}{
+	{"10baseT_Half", (1 << 0), 10_000_000},
+	{"10baseT_Full", (1 << 1), 10_000_000},
+	{"100baseT_Half", (1 << 2), 100_000_000},
+	{"100baseT_Full", (1 << 3), 100_000_000},
+	{"1000baseT_Half", (1 << 4), 1_000_000_000},
+	{"1000baseT_Full", (1 << 5), 1_000_000_000},
+	{"10000baseT_Full", (1 << 12), 10_000_000_000},
+}
+
 type ifreq struct {
 	ifr_name [IFNAMSIZ]byte
 	ifr_data uintptr
@@ -691,4 +706,14 @@ func PermAddr(intf string) (string, error) {
 	}
 	defer e.Close()
 	return e.PermAddr(intf)
+}
+
+func SupportedReadable(mask uint64) []string {
+	ret := make([]string, 0)
+	for _, mode := range SupportedCapacities {
+		if mode.mask&mask != 0 {
+			ret = append(ret, mode.name)
+		}
+	}
+	return ret
 }
