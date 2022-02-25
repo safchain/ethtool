@@ -719,7 +719,7 @@ func SupportedLinkModes(mask uint64) []string {
 	return ret
 }
 
-// SupportedMaxCapacity return the maximum capacity of this interface.
+// SupportedMaxCapacity returns the maximum capacity of this interface.
 func SupportedMaxCapacity(mask uint64) uint64 {
 	ret := uint64(0)
 	for _, mode := range SupportedCapacities {
