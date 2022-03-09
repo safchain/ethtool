@@ -725,7 +725,7 @@ func PermAddr(intf string) (string, error) {
 
 // SupportedLinkModes returns the names of the link modes supported by the interface.
 func SupportedLinkModes(mask uint64) []string {
-	ret := make([]string, 0)
+	var ret []string
 	for _, mode := range SupportedCapabilities {
 		if mode.mask&mask != 0 {
 			ret = append(ret, mode.name)
@@ -736,7 +736,7 @@ func SupportedLinkModes(mask uint64) []string {
 
 // SupportedMaxCapacity returns the maximum capacity of this interface.
 func SupportedMaxCapacity(mask uint64) uint64 {
-	ret := uint64(0)
+	var ret uint64
 	for _, mode := range SupportedLinkModes(mask) {
 		if cap, ok := Capacities[mode]; ok && cap > ret {
 			ret = cap
