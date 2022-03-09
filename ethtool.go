@@ -734,8 +734,8 @@ func SupportedLinkModes(mask uint64) []string {
 	return ret
 }
 
-// SupportedMaxCapacity returns the maximum capacity of this interface.
-func SupportedMaxCapacity(mask uint64) uint64 {
+// SupportedSpeed returns the maximum capacity of this interface.
+func SupportedSpeed(mask uint64) uint64 {
 	var ret uint64
 	for _, mode := range SupportedLinkModes(mask) {
 		if cap, ok := Capacities[mode]; ok && cap > ret {
