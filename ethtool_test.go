@@ -112,7 +112,7 @@ func TestSupportedLinkModes(t *testing.T) {
 		inputMask uint64
 		expected  []string
 	}{
-		{0b01100010_11101111, []string{"10baseT_Half", "10baseT_Full", "100baseT_Half", "100baseT_Full", "1000baseT_Full", "Autoneg", "TP", "MII"}},
+		{0b01100010_11101111, []string{"10baseT_Half", "10baseT_Full", "100baseT_Half", "100baseT_Full", "1000baseT_Full"}},
 	}
 
 	for _, testcase := range cases {
