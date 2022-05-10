@@ -702,6 +702,22 @@ func isFeatureBitSet(blocks [MAX_FEATURE_BLOCKS]ethtoolGetFeaturesBlock, index u
 	return (blocks)[index/32].active&(1<<(index%32)) != 0
 }
 
+type FeatureState struct {
+	Available    bool
+	Requested    bool
+	Active       bool
+	NeverChanged bool
+}
+
+func getFeatureStateBits(blocks [MAX_FEATURE_BLOCKS]ethtoolGetFeaturesBlock, index uint) FeatureState {
+	return FeatureState{
+		Available:    (blocks)[index/32].available&(1<<(index%32)) != 0,
+		Requested:    (blocks)[index/32].requested&(1<<(index%32)) != 0,
+		Active:       (blocks)[index/32].active&(1<<(index%32)) != 0,
+		NeverChanged: (blocks)[index/32].never_changed&(1<<(index%32)) != 0,
+	}
+}
+
 func setFeatureBit(blocks *[MAX_FEATURE_BLOCKS]ethtoolSetFeaturesBlock, index uint, value bool) {
 	blockIndex, bitIndex := index/32, index%32
 
@@ -785,6 +801,36 @@ func (e *Ethtool) Features(intf string) (map[string]bool, error) {
 	result := make(map[string]bool, length)
 	for key, index := range names {
 		result[key] = isFeatureBitSet(features.blocks, index)
+	}
+
+	return result, nil
+}
+
+// FeaturesWithState retrieves features of the given interface name,
+// with extra flags to explain if they can be enabled
+func (e *Ethtool) FeaturesWithState(intf string) (map[string]FeatureState, error) {
+	names, err := e.FeatureNames(intf)
+	if err != nil {
+		return nil, err
+	}
+
+	length := uint32(len(names))
+	if length == 0 {
+		return map[string]FeatureState{}, nil
+	}
+
+	features := ethtoolGfeatures{
+		cmd:  ETHTOOL_GFEATURES,
+		size: (length + 32 - 1) / 32,
+	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&features))); err != nil {
+		return nil, err
+	}
+
+	var result = make(map[string]FeatureState, length)
+	for key, index := range names {
+		result[key] = getFeatureStateBits(features.blocks, index)
 	}
 
 	return result, nil

@@ -122,3 +122,46 @@ func TestSupportedLinkModes(t *testing.T) {
 		}
 	}
 }
+
+func TestFeatures(t *testing.T) {
+	et, err := NewEthtool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer et.Close()
+
+	feats, err := et.Features("lo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(feats) == 0 {
+		// TOOD: do we have a sane subset of features we should check?
+		t.Fatalf("expected features for loopback interface")
+	}
+
+	featsWithState, err := et.FeaturesWithState("lo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(feats) != len(featsWithState) {
+		t.Fatalf("features mismatch: %d with state %d", len(feats), len(featsWithState))
+	}
+
+	fixed := 0
+	for key, val := range feats {
+		state, ok := featsWithState[key]
+		if !ok || val != state.Active {
+			t.Errorf("inconsistent feature: %q reported %v active %v", key, val, state.Active)
+		}
+		if !state.Available {
+			fixed++
+		}
+	}
+
+	if fixed == 0 {
+		// the lo interface MUST have some non-available features, by design
+		t.Fatalf("loopback interface reported all features available")
+	}
+}
