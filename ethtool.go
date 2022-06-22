@@ -28,6 +28,7 @@ package ethtool
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/bits"
 	"strings"
@@ -37,6 +38,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// #include <string.h>
 // #include <stdlib.h>
 import "C"
 
@@ -344,6 +346,15 @@ type ethtoolRxfh struct {
 	rsvd32      uint32
 	//__u32 rss_config[0];
 }
+
+type RSSContext uint32
+
+const (
+	NewContext               RSSContext = ETH_RXFH_CONTEXT_ALLOC
+	ETH_RXFH_CONTEXT_ALLOC              = 0xffffffff
+	ETH_RXFH_INDIR_NO_CHANGE            = 0xffffffff
+)
+
 type ethtoolTcpip4Spec struct {
 	ip4src be32
 	ip4dst be32
@@ -762,7 +773,7 @@ func (e *Ethtool) getStringSet(intf string, ss stringSet, drvinfoOffset uintptr)
 		if ssetInfo.sset_mask != 0 {
 			length = uint32(ssetInfo.data)
 		}
-	} else if err == syscall.EOPNOTSUPP && drvinfoOffset != 0 {
+	} else if errors.Is(err, syscall.EOPNOTSUPP) && drvinfoOffset != 0 {
 		drvinfo, err := e.getDriverInfo(intf)
 		if err != nil {
 			return nil, err
@@ -953,9 +964,9 @@ type flowHashConfig struct {
 
 type FlowHashOption func(*flowHashConfig)
 
-func WithRSSContext(context uint32) FlowHashOption {
+func WithRSSContext(context RSSContext) FlowHashOption {
 	return func(c *flowHashConfig) {
-		c.rss_context = context
+		c.rss_context = uint32(context)
 	}
 }
 
@@ -976,7 +987,7 @@ func (e *Ethtool) GetFlowHash(intf string, opts ...FlowHashOption) (*FlowHash, e
 	rssHead := ethtoolRxfh{cmd: ETHTOOL_GRSSH, rss_context: cfg.rss_context}
 
 	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&rssHead))); err != nil {
-		if err == syscall.EOPNOTSUPP && cfg.rss_context != 0 {
+		if errors.Is(err, syscall.EOPNOTSUPP) && cfg.rss_context != 0 {
 			table, err := e.getFlowHashIndirectTable(intf)
 			if err != nil {
 				return nil, err
@@ -1077,6 +1088,225 @@ func (e *Ethtool) getFlowHashIndirectTable(intf string) ([]uint32, error) {
 	copy(table, (*[1 << 24]uint32)(p)[:n])
 
 	return table, nil
+}
+
+type FlowHashConfig struct {
+	Key     []byte     // Sets RSS hash key of the specified network device.
+	Func    string     // Sets RSS hash function of the specified network device.
+	Start   int        // For the equal and weight options, sets the starting receive queue for spreading flows to N.
+	Equal   int        // Sets the receive flow hash indirection table to spread flows evenly between the first N receive queues.
+	Weight  []int      // Sets the receive flow hash indirection table to spread flows between receive queues according to the given weights.
+	Default bool       //  Sets the receive flow hash indirection table to its default value.
+	Context RSSContext // Specifies an RSS context to act on; either new (0) to allocate a new RSS context
+	Delete  bool       // Delete the specified RSS context.
+}
+
+func (c *FlowHashConfig) Validate() error {
+	if c.Equal != 0 {
+		if len(c.Weight) != 0 {
+			return errors.New("Equal and weight options are mutually exclusive")
+		}
+
+		if c.Default {
+			return errors.New("Equal and default options are mutually exclusive")
+		}
+	}
+
+	if len(c.Weight) != 0 && c.Default {
+		return errors.New("Weight and default options are mutually exclusive")
+	}
+
+	if c.Start != 0 {
+		if c.Default {
+			return errors.New("Start and default options are mutually exclusive")
+		}
+
+		if !(c.Equal != 0 || len(c.Weight) != 0) {
+			return errors.New("Start must be used with equal or weight options")
+		}
+	}
+
+	if c.Default && c.Context != 0 {
+		return errors.New("Default and context options are mutually exclusive")
+	}
+
+	if c.Delete {
+		if c.Context == 0 {
+			return errors.New("Delete option requires context option")
+		}
+
+		if len(c.Weight) != 0 {
+			return errors.New("Delete and weight options are mutually exclusive")
+		}
+
+		if c.Equal != 0 {
+			return errors.New("Delete and equal options are mutually exclusive")
+		}
+
+		if c.Default {
+			return errors.New("Delete and default options are mutually exclusive")
+		}
+
+		if len(c.Key) != 0 {
+			return errors.New("Delete and hkey options are mutually exclusive")
+		}
+	}
+
+	return nil
+}
+
+func (e *Ethtool) SetFlowHash(intf string, c *FlowHashConfig) error {
+	if err := c.Validate(); err != nil {
+		return err
+	}
+
+	ringCount := ethtoolRxnfc{cmd: ETHTOOL_GRXRINGS}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&ringCount))); err != nil {
+		return fmt.Errorf("get RX ring count, %w", err)
+	}
+
+	rssHead := ethtoolRxfh{cmd: ETHTOOL_GRSSH}
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&rssHead))); err != nil {
+		if errors.Is(err, syscall.EOPNOTSUPP) && len(c.Key) == 0 && len(c.Func) == 0 && c.Context == 0 {
+			return e.setFlowHashIndirect(intf, c)
+		}
+
+		return fmt.Errorf("get RX flow hash indir size and key size, %w", err)
+	}
+
+	var indirBytes uintptr
+
+	if c.Equal != 0 || len(c.Weight) != 0 {
+		indirBytes = uintptr(rssHead.indir_size) * unsafe.Sizeof(uint32(0))
+	}
+
+	var hfunc byte
+
+	if rssHead.hfunc != 0 && len(c.Func) > 0 {
+		funcs, err := e.getStringSet(intf, ETH_SS_RSS_HASH_FUNCS, 0)
+		if err != nil {
+			return fmt.Errorf("get hash functions names, %w", err)
+		}
+
+		if v, exists := funcs[c.Func]; exists {
+			hfunc = 1 << v
+		}
+
+		if hfunc == 0 {
+			return fmt.Errorf("unknown hash function `%s`", c.Func)
+		}
+	}
+
+	sz := unsafe.Sizeof(ethtoolRxfh{}) + indirBytes + uintptr(rssHead.key_size)
+	rss := (*ethtoolRxfh)(C.calloc(1, C.ulong(sz)))
+	defer C.free(unsafe.Pointer(rss))
+
+	rss.cmd = ETHTOOL_SRSSH
+	rss.rss_context = uint32(c.Context)
+	rss.hfunc = hfunc
+	if !c.Delete {
+		rss.key_size = rssHead.key_size
+
+		ptr := uintptr(unsafe.Pointer(rss)) + unsafe.Sizeof(ethtoolRxfh{})
+		table := (*[1 << 24]uint32)(unsafe.Pointer(ptr))[:rssHead.indir_size]
+
+		sz, err := e.fillIndirectTable(c, table)
+		if err != nil {
+			return fmt.Errorf("fill RX flow hash indirection table, %w", err)
+		}
+
+		rss.indir_size = uint32(sz)
+	}
+
+	if len(c.Key) > 0 {
+		dst := unsafe.Pointer(uintptr(unsafe.Pointer(rss)) + unsafe.Sizeof(ethtoolRxfh{}) + indirBytes)
+		src := C.CBytes(c.Key)
+		defer C.free(src)
+		C.memcpy(dst, src, C.ulong(len(c.Key)))
+	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(rss))); err != nil {
+		return fmt.Errorf("set RX flow hash configuration, %w", err)
+	}
+
+	if c.Context == ETH_RXFH_CONTEXT_ALLOC {
+		c.Context = RSSContext(rss.rss_context)
+	}
+
+	return nil
+}
+
+func (e *Ethtool) setFlowHashIndirect(intf string, c *FlowHashConfig) error {
+	indirHead := ethtoolRxfhIndir{cmd: ETHTOOL_GRXFHINDIR}
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&indirHead))); err != nil {
+		return fmt.Errorf("get RX flow hash indirection table size, %w", err)
+	}
+
+	sz := unsafe.Sizeof(ethtoolRxfhIndir{}) + uintptr(indirHead.size)*unsafe.Sizeof(uint32(0))
+	indir := (*ethtoolRxfhIndir)(C.calloc(1, C.ulong(sz)))
+	defer C.free(unsafe.Pointer(indir))
+
+	indir.cmd = ETHTOOL_SRXFHINDIR
+	indir.size = indirHead.size
+
+	ptr := uintptr(unsafe.Pointer(indir)) + unsafe.Sizeof(ethtoolRxfhIndir{})
+	table := (*[1 << 24]uint32)(unsafe.Pointer(ptr))[:indirHead.size]
+
+	n, err := e.fillIndirectTable(c, table)
+	if err != nil {
+		return fmt.Errorf("fill RX flow hash indirection table, %w", err)
+	}
+
+	indir.size = uint32(n)
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(indir))); err != nil {
+		return fmt.Errorf("set RX flow hash indirection table, %w", err)
+	}
+
+	return nil
+}
+
+func (e *Ethtool) fillIndirectTable(c *FlowHashConfig, table []uint32) (int, error) {
+	if c.Equal != 0 {
+		for i := range table {
+			table[i] = uint32(c.Start + i%c.Equal)
+		}
+
+		return len(table), nil
+	}
+
+	if len(c.Weight) != 0 {
+		var sum int
+		for _, n := range c.Weight {
+			sum += n
+		}
+
+		if sum == 0 {
+			return 0, errors.New("At least one weight must be non-zero")
+		}
+
+		if sum > len(table) {
+			return 0, errors.New("Total weight exceeds the size of the indirection table")
+		}
+
+		var partial int
+
+		j := -1
+		for i := range table {
+			for i >= len(table)*partial/sum {
+				j += 1
+				partial += c.Weight[j]
+			}
+			table[i] = uint32(c.Start + j)
+		}
+	}
+
+	if c.Default {
+		return 0, nil
+	}
+
+	return ETH_RXFH_INDIR_NO_CHANGE, nil
 }
 
 // Close closes the ethool handler
