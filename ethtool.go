@@ -29,11 +29,16 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math/bits"
 	"strings"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
 )
+
+// #include <stdlib.h>
+import "C"
 
 // Maximum size of an interface name
 const (
@@ -45,32 +50,125 @@ const (
 	SIOCETHTOOL = 0x8946
 )
 
+type stringSet uint32
+
+const (
+	ETH_SS_TEST stringSet = iota
+	ETH_SS_STATS
+	ETH_SS_PRIV_FLAGS
+	ETH_SS_NTUPLE_FILTERS
+	ETH_SS_FEATURES
+	ETH_SS_RSS_HASH_FUNCS
+	ETH_SS_TUNABLES
+	ETH_SS_PHY_STATS
+	ETH_SS_PHY_TUNABLES
+	ETH_SS_LINK_MODES
+	ETH_SS_MSG_CLASSES
+	ETH_SS_WOL_MODES
+	ETH_SS_SOF_TIMESTAMPING
+	ETH_SS_TS_TX_TYPES
+	ETH_SS_TS_RX_FILTERS
+	ETH_SS_UDP_TUNNEL_TYPES
+	ETH_SS_STATS_STD
+	ETH_SS_STATS_ETH_PHY
+	ETH_SS_STATS_ETH_MAC
+	ETH_SS_STATS_ETH_CTRL
+	ETH_SS_STATS_RMON
+)
+
 // ethtool stats related constants.
 const (
-	ETH_GSTRING_LEN  = 32
-	ETH_SS_STATS     = 1
-	ETH_SS_FEATURES  = 4
-	ETHTOOL_GDRVINFO = 0x00000003
-	ETHTOOL_GSTRINGS = 0x0000001b
-	ETHTOOL_GSTATS   = 0x0000001d
+	ETH_GSTRING_LEN = 32
+
 	// other CMDs from ethtool-copy.h of ethtool-3.5 package
-	ETHTOOL_GSET      = 0x00000001 /* Get settings. */
-	ETHTOOL_SSET      = 0x00000002 /* Set settings. */
-	ETHTOOL_GMSGLVL   = 0x00000007 /* Get driver message level */
-	ETHTOOL_SMSGLVL   = 0x00000008 /* Set driver msg level. */
-	ETHTOOL_GCHANNELS = 0x0000003c /* Get no of channels */
-	ETHTOOL_SCHANNELS = 0x0000003d /* Set no of channels */
-	ETHTOOL_GCOALESCE = 0x0000000e /* Get coalesce config */
+	ETHTOOL_GSET     = 0x00000001 /* Get settings. */
+	ETHTOOL_SSET     = 0x00000002 /* Set settings. */
+	ETHTOOL_GDRVINFO = 0x00000003 /* Get driver info. */
+	ETHTOOL_GREGS    = 0x00000004 /* Get NIC registers. */
+	ETHTOOL_GWOL     = 0x00000005 /* Get wake-on-lan options. */
+	ETHTOOL_SWOL     = 0x00000006 /* Set wake-on-lan options. */
+	ETHTOOL_GMSGLVL  = 0x00000007 /* Get driver message level */
+	ETHTOOL_SMSGLVL  = 0x00000008 /* Set driver msg level. */
+	ETHTOOL_NWAY_RST = 0x00000009 /* Restart autonegotiation. */
+
 	/* Get link status for host, i.e. whether the interface *and* the
 	 * physical port (if there is one) are up (ethtool_value). */
-	ETHTOOL_GLINK         = 0x0000000a
-	ETHTOOL_GMODULEINFO   = 0x00000042 /* Get plug-in module information */
-	ETHTOOL_GMODULEEEPROM = 0x00000043 /* Get plug-in module eeprom */
-	ETHTOOL_GPERMADDR     = 0x00000020
+	ETHTOOL_GLINK       = 0x0000000a
+	ETHTOOL_GEEPROM     = 0x0000000b /* Get EEPROM data */
+	ETHTOOL_SEEPROM     = 0x0000000c /* Set EEPROM data. */
+	ETHTOOL_GCOALESCE   = 0x0000000e /* Get coalesce config */
+	ETHTOOL_SCOALESCE   = 0x0000000f /* Set coalesce config. */
+	ETHTOOL_GRINGPARAM  = 0x00000010 /* Get ring parameters */
+	ETHTOOL_SRINGPARAM  = 0x00000011 /* Set ring parameters. */
+	ETHTOOL_GPAUSEPARAM = 0x00000012 /* Get pause parameters */
+	ETHTOOL_SPAUSEPARAM = 0x00000013 /* Set pause parameters. */
+	ETHTOOL_GRXCSUM     = 0x00000014 /* Get RX hw csum enable (ethtool_value) */
+	ETHTOOL_SRXCSUM     = 0x00000015 /* Set RX hw csum enable (ethtool_value) */
+	ETHTOOL_GTXCSUM     = 0x00000016 /* Get TX hw csum enable (ethtool_value) */
+	ETHTOOL_STXCSUM     = 0x00000017 /* Set TX hw csum enable (ethtool_value) */
+	ETHTOOL_GSG         = 0x00000018 /* Get scatter-gather enable (ethtool_value) */
+	ETHTOOL_SSG         = 0x00000019 /* Set scatter-gather enable (ethtool_value). */
+	ETHTOOL_TEST        = 0x0000001a /* execute NIC self-test. */
+	ETHTOOL_GSTRINGS    = 0x0000001b /* get specified string set */
+	ETHTOOL_PHYS_ID     = 0x0000001c /* identify the NIC */
+	ETHTOOL_GSTATS      = 0x0000001d /* get NIC-specific statistics */
+	ETHTOOL_GTSO        = 0x0000001e /* Get TSO enable (ethtool_value) */
+	ETHTOOL_STSO        = 0x0000001f /* Set TSO enable (ethtool_value) */
+	ETHTOOL_GPERMADDR   = 0x00000020 /* Get permanent hardware address */
+	ETHTOOL_GUFO        = 0x00000021 /* Get UFO enable (ethtool_value) */
+	ETHTOOL_SUFO        = 0x00000022 /* Set UFO enable (ethtool_value) */
+	ETHTOOL_GGSO        = 0x00000023 /* Get GSO enable (ethtool_value) */
+	ETHTOOL_SGSO        = 0x00000024 /* Set GSO enable (ethtool_value) */
+	ETHTOOL_GFLAGS      = 0x00000025 /* Get flags bitmap(ethtool_value) */
+	ETHTOOL_SFLAGS      = 0x00000026 /* Set flags bitmap(ethtool_value) */
+	ETHTOOL_GPFLAGS     = 0x00000027 /* Get driver-private flags bitmap */
+	ETHTOOL_SPFLAGS     = 0x00000028 /* Set driver-private flags bitmap */
+
+	ETHTOOL_GRXFH       = 0x00000029 /* Get RX flow hash configuration */
+	ETHTOOL_SRXFH       = 0x0000002a /* Set RX flow hash configuration */
+	ETHTOOL_GGRO        = 0x0000002b /* Get GRO enable (ethtool_value) */
+	ETHTOOL_SGRO        = 0x0000002c /* Set GRO enable (ethtool_value) */
+	ETHTOOL_GRXRINGS    = 0x0000002d /* Get RX rings available for LB */
+	ETHTOOL_GRXCLSRLCNT = 0x0000002e /* Get RX class rule count */
+	ETHTOOL_GRXCLSRULE  = 0x0000002f /* Get RX classification rule */
+	ETHTOOL_GRXCLSRLALL = 0x00000030 /* Get all RX classification rule */
+	ETHTOOL_SRXCLSRLDEL = 0x00000031 /* Delete RX classification rule */
+	ETHTOOL_SRXCLSRLINS = 0x00000032 /* Insert RX classification rule */
+	ETHTOOL_FLASHDEV    = 0x00000033 /* Flash firmware to device */
+	ETHTOOL_RESET       = 0x00000034 /* Reset hardware */
+	ETHTOOL_SRXNTUPLE   = 0x00000035 /* Add an n-tuple filter to device */
+	ETHTOOL_GRXNTUPLE   = 0x00000036 /* deprecated */
+	ETHTOOL_GSSET_INFO  = 0x00000037 /* Get string set info */
+	ETHTOOL_GRXFHINDIR  = 0x00000038 /* Get RX flow hash indir'n table */
+	ETHTOOL_SRXFHINDIR  = 0x00000039 /* Set RX flow hash indir'n table */
+
 	ETHTOOL_GFEATURES     = 0x0000003a /* Get device offload settings */
 	ETHTOOL_SFEATURES     = 0x0000003b /* Change device offload settings */
-	ETHTOOL_GFLAGS        = 0x00000025 /* Get flags bitmap(ethtool_value) */
-	ETHTOOL_GSSET_INFO    = 0x00000037 /* Get string set info */
+	ETHTOOL_GCHANNELS     = 0x0000003c /* Get no of channels */
+	ETHTOOL_SCHANNELS     = 0x0000003d /* Set no of channels */
+	ETHTOOL_SET_DUMP      = 0x0000003e /* Set dump settings */
+	ETHTOOL_GET_DUMP_FLAG = 0x0000003f /* Get dump settings */
+	ETHTOOL_GET_DUMP_DATA = 0x00000040 /* Get dump data */
+	ETHTOOL_GET_TS_INFO   = 0x00000041 /* Get time stamping and PHC info */
+	ETHTOOL_GMODULEINFO   = 0x00000042 /* Get plug-in module information */
+	ETHTOOL_GMODULEEEPROM = 0x00000043 /* Get plug-in module eeprom */
+	ETHTOOL_GEEE          = 0x00000044 /* Get EEE settings */
+	ETHTOOL_SEEE          = 0x00000045 /* Set EEE settings */
+
+	ETHTOOL_GRSSH     = 0x00000046 /* Get RX flow hash configuration */
+	ETHTOOL_SRSSH     = 0x00000047 /* Set RX flow hash configuration */
+	ETHTOOL_GTUNABLE  = 0x00000048 /* Get tunable configuration */
+	ETHTOOL_STUNABLE  = 0x00000049 /* Set tunable configuration */
+	ETHTOOL_GPHYSTATS = 0x0000004a /* get PHY-specific statistics */
+
+	ETHTOOL_PERQUEUE = 0x0000004b /* Set per queue options */
+
+	ETHTOOL_GLINKSETTINGS = 0x0000004c /* Get ethtool_link_settings */
+	ETHTOOL_SLINKSETTINGS = 0x0000004d /* Set ethtool_link_settings */
+	ETHTOOL_PHY_GTUNABLE  = 0x0000004e /* Get PHY tunable configuration */
+	ETHTOOL_PHY_STUNABLE  = 0x0000004f /* Set PHY tunable configuration */
+	ETHTOOL_GFECPARAM     = 0x00000050 /* Get FEC settings */
+	ETHTOOL_SFECPARAM     = 0x00000051 /* Set FEC settings */
 )
 
 // MAX_GSTRINGS maximum number of stats entries that ethtool can
@@ -80,6 +178,7 @@ const (
 	MAX_FEATURE_BLOCKS = (MAX_GSTRINGS + 32 - 1) / 32
 	EEPROM_LEN         = 640
 	PERMADDR_LEN       = 32
+	ETH_ALEN           = 6
 )
 
 type ifreq struct {
@@ -230,6 +329,175 @@ type ethtoolPermAddr struct {
 	data [PERMADDR_LEN]byte
 }
 
+type (
+	be16 = uint16
+	be32 = uint32
+)
+
+type ethtoolRxfh struct {
+	cmd         uint32
+	rss_context uint32
+	indir_size  uint32
+	key_size    uint32
+	hfunc       byte
+	rsvd8       [3]byte
+	rsvd32      uint32
+	//__u32 rss_config[0];
+}
+type ethtoolTcpip4Spec struct {
+	ip4src be32
+	ip4dst be32
+	psrc   be16
+	pdst   be16
+	tos    uint8
+}
+
+type ethtoolTcpip6Spec struct {
+	ip6src [4]be32
+	ip6dst [4]be32
+	psrc   be16
+	pdst   be16
+	tclass byte
+}
+
+type ethtoolAhEspip4Spec struct {
+	ip4src be32
+	ip4dst be32
+	spi    be32
+	tos    byte
+}
+
+type ethtoolAhEspip6Spec struct {
+	ip6src [4]be32
+	ip6dst [4]be32
+	spi    be32
+	tclass byte
+}
+
+type ethtoolUsrip4Spec struct {
+	ip4src     be32
+	ip4dst     be32
+	l4_4_bytes be32
+	tos        byte
+	ip_ver     byte
+	proto      byte
+}
+
+type ethtoolUsrip6Spec struct {
+	ip6src     [4]be32
+	ip6dst     [4]be32
+	l4_4_bytes be32
+	tclass     byte
+	l4_proto   byte
+}
+
+type ethhdr struct {
+	h_dest   [ETH_ALEN]byte // destination eth addr
+	h_source [ETH_ALEN]byte // source ether addr
+	h_proto  be16           // packet type ID field
+}
+
+type ethtoolFlowUnion struct {
+	// struct ethtool_tcpip4_spec		tcp_ip4_spec;
+	// struct ethtool_tcpip4_spec		udp_ip4_spec;
+	// struct ethtool_tcpip4_spec		sctp_ip4_spec;
+	// struct ethtool_ah_espip4_spec		ah_ip4_spec;
+	// struct ethtool_ah_espip4_spec		esp_ip4_spec;
+	// struct ethtool_usrip4_spec		usr_ip4_spec;
+	// struct ethtool_tcpip6_spec		tcp_ip6_spec;
+	// struct ethtool_tcpip6_spec		udp_ip6_spec;
+	// struct ethtool_tcpip6_spec		sctp_ip6_spec;
+	// struct ethtool_ah_espip6_spec		ah_ip6_spec;
+	// struct ethtool_ah_espip6_spec		esp_ip6_spec;
+	// struct ethtool_usrip6_spec		usr_ip6_spec;
+	// struct ethhdr				ether_spec;
+	hdata [52]byte
+}
+
+func (u *ethtoolFlowUnion) tcpIp4Spec() *ethtoolTcpip4Spec {
+	return (*ethtoolTcpip4Spec)(unsafe.Pointer(&u.hdata[0]))
+}
+
+func (u *ethtoolFlowUnion) udpIp4Spec() *ethtoolTcpip4Spec {
+	return (*ethtoolTcpip4Spec)(unsafe.Pointer(&u.hdata[0]))
+}
+
+func (u *ethtoolFlowUnion) sctpIp4Spec() *ethtoolTcpip4Spec {
+	return (*ethtoolTcpip4Spec)(unsafe.Pointer(&u.hdata[0]))
+}
+
+func (u *ethtoolFlowUnion) ahIp4Spec() *ethtoolAhEspip4Spec {
+	return (*ethtoolAhEspip4Spec)(unsafe.Pointer(&u.hdata[0]))
+}
+
+func (u *ethtoolFlowUnion) espIp4Spec() *ethtoolAhEspip4Spec {
+	return (*ethtoolAhEspip4Spec)(unsafe.Pointer(&u.hdata[0]))
+}
+
+func (u *ethtoolFlowUnion) usrIp4Spec() *ethtoolUsrip4Spec {
+	return (*ethtoolUsrip4Spec)(unsafe.Pointer(&u.hdata[0]))
+}
+
+func (u *ethtoolFlowUnion) tcpIp6Spec() *ethtoolTcpip6Spec {
+	return (*ethtoolTcpip6Spec)(unsafe.Pointer(&u.hdata[0]))
+}
+
+func (u *ethtoolFlowUnion) udpIp6Spec() *ethtoolTcpip6Spec {
+	return (*ethtoolTcpip6Spec)(unsafe.Pointer(&u.hdata[0]))
+}
+
+func (u *ethtoolFlowUnion) sctpIp6Spec() *ethtoolTcpip6Spec {
+	return (*ethtoolTcpip6Spec)(unsafe.Pointer(&u.hdata[0]))
+}
+
+func (u *ethtoolFlowUnion) ahIp6Spec() *ethtoolAhEspip6Spec {
+	return (*ethtoolAhEspip6Spec)(unsafe.Pointer(&u.hdata[0]))
+}
+
+func (u *ethtoolFlowUnion) espIp6Spec() *ethtoolAhEspip6Spec {
+	return (*ethtoolAhEspip6Spec)(unsafe.Pointer(&u.hdata[0]))
+}
+
+func (u *ethtoolFlowUnion) usrIp6Spec() *ethtoolUsrip6Spec {
+	return (*ethtoolUsrip6Spec)(unsafe.Pointer(&u.hdata[0]))
+}
+
+func (u *ethtoolFlowUnion) etherSpec() *ethhdr {
+	return (*ethhdr)(unsafe.Pointer(&u.hdata[0]))
+}
+
+type ethtoolFlowExt struct {
+	padding    [2]byte
+	h_dest     [ETH_ALEN]byte
+	vlan_etype be16
+	vlan_tci   be16
+	data       [2]be32
+}
+
+type ethtoolRxFlowSpec struct {
+	flow_type   uint32
+	h_u         ethtoolFlowUnion
+	h_ext       ethtoolFlowExt
+	m_u         ethtoolFlowUnion
+	m_ext       ethtoolFlowExt
+	ring_cookie uint64
+	location    uint32
+}
+
+type ethtoolRxnfc struct {
+	cmd                     uint32
+	flow_type               uint32
+	data                    uint64
+	fs                      ethtoolRxFlowSpec
+	rule_cnt_or_rss_context uint32
+}
+
+type ethtoolRxfhIndir struct {
+	cmd  uint32
+	size uint32
+	//__u32 ring_index[0];
+}
+
 type Ethtool struct {
 	fd int
 }
@@ -376,16 +644,16 @@ func (e *Ethtool) ioctl(intf string, data uintptr) error {
 	return nil
 }
 
-func (e *Ethtool) getDriverInfo(intf string) (ethtoolDrvInfo, error) {
+func (e *Ethtool) getDriverInfo(intf string) (*ethtoolDrvInfo, error) {
 	drvinfo := ethtoolDrvInfo{
 		cmd: ETHTOOL_GDRVINFO,
 	}
 
 	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&drvinfo))); err != nil {
-		return ethtoolDrvInfo{}, err
+		return nil, err
 	}
 
-	return drvinfo, nil
+	return &drvinfo, nil
 }
 
 func (e *Ethtool) getChannels(intf string) (Channels, error) {
@@ -479,25 +747,41 @@ func setFeatureBit(blocks *[MAX_FEATURE_BLOCKS]ethtoolSetFeaturesBlock, index ui
 
 // FeatureNames shows supported features by their name.
 func (e *Ethtool) FeatureNames(intf string) (map[string]uint, error) {
+	return e.getStringSet(intf, ETH_SS_FEATURES, 0)
+}
+
+func (e *Ethtool) getStringSet(intf string, ss stringSet, drvinfoOffset uintptr) (map[string]uint, error) {
 	ssetInfo := ethtoolSsetInfo{
 		cmd:       ETHTOOL_GSSET_INFO,
-		sset_mask: 1 << ETH_SS_FEATURES,
+		sset_mask: 1 << ss,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&ssetInfo))); err != nil {
+	var length uint32
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&ssetInfo))); err == nil {
+		if ssetInfo.sset_mask != 0 {
+			length = uint32(ssetInfo.data)
+		}
+	} else if err == syscall.EOPNOTSUPP && drvinfoOffset != 0 {
+		drvinfo, err := e.getDriverInfo(intf)
+		if err != nil {
+			return nil, err
+		}
+
+		length = *(*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(drvinfo)) + drvinfoOffset))
+	} else {
 		return nil, err
 	}
 
-	length := uint32(ssetInfo.data)
 	if length == 0 {
-		return map[string]uint{}, nil
+		return nil, nil
 	} else if length > MAX_GSTRINGS {
 		return nil, fmt.Errorf("ethtool currently doesn't support more than %d entries, received %d", MAX_GSTRINGS, length)
 	}
 
 	gstrings := ethtoolGStrings{
 		cmd:        ETHTOOL_GSTRINGS,
-		string_set: ETH_SS_FEATURES,
+		string_set: uint32(ss),
 		len:        length,
 		data:       [MAX_GSTRINGS * ETH_GSTRING_LEN]byte{},
 	}
@@ -601,7 +885,7 @@ func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
 
 	gstrings := ethtoolGStrings{
 		cmd:        ETHTOOL_GSTRINGS,
-		string_set: ETH_SS_STATS,
+		string_set: uint32(ETH_SS_STATS),
 		len:        drvinfo.n_stats,
 		data:       [MAX_GSTRINGS * ETH_GSTRING_LEN]byte{},
 	}
@@ -634,6 +918,165 @@ func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
 	}
 
 	return result, nil
+}
+
+type IndirectTable []uint32
+
+func (t IndirectTable) String() string {
+	var b strings.Builder
+
+	for i, n := range t {
+		if i%8 == 0 {
+			fmt.Fprintf(&b, "%5d: ", i)
+		}
+
+		fmt.Fprintf(&b, " %5d", n)
+
+		if i%8 == 7 || i == len(t)-1 {
+			fmt.Fprintln(&b, "")
+		}
+	}
+
+	return b.String()
+}
+
+type FlowHash struct {
+	RingCount int
+	Key       []byte
+	Funcs     map[string]bool
+	Table     IndirectTable
+}
+
+type flowHashConfig struct {
+	rss_context uint32
+}
+
+type FlowHashOption func(*flowHashConfig)
+
+func WithRSSContext(context uint32) FlowHashOption {
+	return func(c *flowHashConfig) {
+		c.rss_context = context
+	}
+}
+
+// GetFlowHash get rx flow hash indirection table and/or RSS hash key
+func (e *Ethtool) GetFlowHash(intf string, opts ...FlowHashOption) (*FlowHash, error) {
+	var cfg flowHashConfig
+
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	ringCount := ethtoolRxnfc{cmd: ETHTOOL_GRXRINGS}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&ringCount))); err != nil {
+		return nil, fmt.Errorf("get RX ring count, %w", err)
+	}
+
+	rssHead := ethtoolRxfh{cmd: ETHTOOL_GRSSH, rss_context: cfg.rss_context}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&rssHead))); err != nil {
+		if err == syscall.EOPNOTSUPP && cfg.rss_context != 0 {
+			table, err := e.getFlowHashIndirectTable(intf)
+			if err != nil {
+				return nil, err
+			}
+			return &FlowHash{RingCount: int(ringCount.data), Table: table}, nil
+		}
+
+		return nil, fmt.Errorf("get RX flow hash indir size and/or key size, %w", err)
+	}
+
+	sz := unsafe.Sizeof(ethtoolRxfh{}) + uintptr(rssHead.indir_size)*unsafe.Sizeof(uint32(0)) + uintptr(rssHead.key_size)
+	rss := (*ethtoolRxfh)(C.calloc(1, C.ulong(sz)))
+	defer C.free(unsafe.Pointer(rss))
+
+	rss.cmd = ETHTOOL_GRSSH
+	rss.rss_context = cfg.rss_context
+	rss.indir_size = rssHead.indir_size
+	rss.key_size = rssHead.key_size
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(rss))); err != nil {
+		return nil, fmt.Errorf("get RX flow hash configuration, %w", err)
+	}
+
+	n := uintptr(rss.indir_size)
+	if unsafe.Sizeof(ethtoolRxfh{})+n*unsafe.Sizeof(uint32(0)) > sz {
+		return nil, fmt.Errorf("get RX flow indirect table, %w", syscall.ERANGE)
+	}
+
+	p := unsafe.Pointer(uintptr(unsafe.Pointer(rss)) + unsafe.Sizeof(ethtoolRxfh{}))
+	table := make([]uint32, n)
+	copy(table, (*[1 << 24]uint32)(p)[:n])
+
+	var key []byte
+
+	if rss.key_size > 0 {
+		off := unsafe.Sizeof(ethtoolRxfh{}) + uintptr(rss.indir_size)*unsafe.Sizeof(uint32(0))
+
+		if off+uintptr(rss.key_size) > sz {
+			return nil, syscall.ERANGE
+		} else {
+			key = C.GoBytes(unsafe.Pointer((uintptr(unsafe.Pointer(rss)) + off)), C.int(rss.key_size))
+		}
+	}
+
+	var funcs map[string]bool
+
+	if rss.hfunc == 0 {
+		return nil, syscall.ENOTSUP
+	}
+
+	hfuncs, err := e.getStringSet(intf, ETH_SS_RSS_HASH_FUNCS, 0)
+	if err != nil {
+		return nil, fmt.Errorf("get hash functions names, %w", err)
+	}
+
+	funcs = make(map[string]bool, bits.OnesCount8(rss.hfunc))
+	for name, i := range hfuncs {
+		funcs[name] = (rss.hfunc & (1 << i)) != 0
+	}
+
+	return &FlowHash{
+		RingCount: int(ringCount.data),
+		Key:       key,
+		Funcs:     funcs,
+		Table:     table,
+	}, nil
+}
+
+func (e *Ethtool) getFlowHashIndirectTable(intf string) ([]uint32, error) {
+	indirHead := ethtoolRxfhIndir{cmd: ETHTOOL_GRXFHINDIR}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&indirHead))); err != nil {
+		return nil, fmt.Errorf("get RX flow hash indirection table size, %w", err)
+	}
+
+	sz := unsafe.Sizeof(ethtoolRxfhIndir{}) + uintptr(indirHead.size)*unsafe.Sizeof(uint32(0))
+	indir := (*ethtoolRxfhIndir)(C.calloc(1, C.ulong(sz)))
+	defer C.free(unsafe.Pointer(indir))
+
+	indir.cmd = ETHTOOL_GRXFHINDIR
+	indir.size = indirHead.size
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&indirHead))); err != nil {
+		return nil, fmt.Errorf("get RX flow hash indirection table, %w", err)
+	}
+
+	if indir.size == 0 {
+		return nil, syscall.ENOTSUP
+	}
+
+	n := uintptr(indir.size)
+	if unsafe.Sizeof(ethtoolRxfhIndir{})+n*unsafe.Sizeof(uint32(0)) > sz {
+		return nil, fmt.Errorf("get RX flow indirect table, %w", syscall.ERANGE)
+	}
+
+	p := unsafe.Pointer(uintptr(unsafe.Pointer(indir)) + unsafe.Sizeof(ethtoolRxfhIndir{}))
+	table := make([]uint32, n)
+	copy(table, (*[1 << 24]uint32)(p)[:n])
+
+	return table, nil
 }
 
 // Close closes the ethool handler
