@@ -39,10 +39,10 @@ type ethtoolValue struct { /* ethtool.c: struct ethtool_value */
 // MsglvlGet returns the msglvl of the given interface.
 func (e *Ethtool) MsglvlGet(intf string) (uint32, error) {
 	edata := ethtoolValue{
-		cmd: ETHTOOL_GMSGLVL,
+		cmd: unix.ETHTOOL_GMSGLVL,
 	}
 
-	var name [IFNAMSIZ]byte
+	var name [unix.IFNAMSIZ]byte
 	copy(name[:], []byte(intf))
 
 	ifr := ifreq{
@@ -51,7 +51,7 @@ func (e *Ethtool) MsglvlGet(intf string) (uint32, error) {
 	}
 
 	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
-		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+		unix.SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return 0, ep
 	}
@@ -62,10 +62,10 @@ func (e *Ethtool) MsglvlGet(intf string) (uint32, error) {
 // MsglvlSet returns the read-msglvl, post-set-msglvl of the given interface.
 func (e *Ethtool) MsglvlSet(intf string, valset uint32) (uint32, uint32, error) {
 	edata := ethtoolValue{
-		cmd: ETHTOOL_GMSGLVL,
+		cmd: unix.ETHTOOL_GMSGLVL,
 	}
 
-	var name [IFNAMSIZ]byte
+	var name [unix.IFNAMSIZ]byte
 	copy(name[:], []byte(intf))
 
 	ifr := ifreq{
@@ -74,18 +74,18 @@ func (e *Ethtool) MsglvlSet(intf string, valset uint32) (uint32, uint32, error) 
 	}
 
 	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
-		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+		unix.SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return 0, 0, ep
 	}
 
 	readval := edata.data
 
-	edata.cmd = ETHTOOL_SMSGLVL
+	edata.cmd = unix.ETHTOOL_SMSGLVL
 	edata.data = valset
 
 	_, _, ep = unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
-		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+		unix.SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return 0, 0, ep
 	}

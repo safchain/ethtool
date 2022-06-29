@@ -34,23 +34,23 @@ import (
 )
 
 type EthtoolCmd struct { /* ethtool.c: struct ethtool_cmd */
-	Cmd            uint32
-	Supported      uint32
-	Advertising    uint32
-	Speed          uint16
-	Duplex         uint8
-	Port           uint8
-	Phy_address    uint8
-	Transceiver    uint8
-	Autoneg        uint8
-	Mdio_support   uint8
-	Maxtxpkt       uint32
-	Maxrxpkt       uint32
-	Speed_hi       uint16
-	Eth_tp_mdix    uint8
-	Reserved2      uint8
-	Lp_advertising uint32
-	Reserved       [2]uint32
+	Cmd              uint32
+	Supported        uint32
+	Advertising      uint32
+	Speed            uint16
+	Duplex           uint8
+	Port             uint8
+	Phy_address      uint8
+	Transceiver      uint8
+	Autoneg          uint8
+	Mdio_support     uint8
+	Maxtxpkt         uint32
+	Maxrxpkt         uint32
+	Speed_hi         uint16
+	Eth_tp_mdix      uint8
+	Eth_tp_mdix_ctrl uint8
+	Lp_advertising   uint32
+	Reserved         [2]uint32
 }
 
 // CmdGet returns the interface settings in the receiver struct
@@ -112,9 +112,9 @@ func (f *EthtoolCmd) reflect(retv *map[string]uint64) {
 // CmdGet returns the interface settings in the receiver struct
 // and returns speed
 func (e *Ethtool) CmdGet(ecmd *EthtoolCmd, intf string) (uint32, error) {
-	ecmd.Cmd = ETHTOOL_GSET
+	ecmd.Cmd = unix.ETHTOOL_GSET
 
-	var name [IFNAMSIZ]byte
+	var name [unix.IFNAMSIZ]byte
 	copy(name[:], []byte(intf))
 
 	ifr := ifreq{
@@ -123,7 +123,7 @@ func (e *Ethtool) CmdGet(ecmd *EthtoolCmd, intf string) (uint32, error) {
 	}
 
 	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
-		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+		unix.SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return 0, ep
 	}
@@ -140,9 +140,9 @@ func (e *Ethtool) CmdGet(ecmd *EthtoolCmd, intf string) (uint32, error) {
 // CmdSet sets and returns the settings in the receiver struct
 // and returns speed
 func (e *Ethtool) CmdSet(ecmd *EthtoolCmd, intf string) (uint32, error) {
-	ecmd.Cmd = ETHTOOL_SSET
+	ecmd.Cmd = unix.ETHTOOL_SSET
 
-	var name [IFNAMSIZ]byte
+	var name [unix.IFNAMSIZ]byte
 	copy(name[:], []byte(intf))
 
 	ifr := ifreq{
@@ -151,7 +151,7 @@ func (e *Ethtool) CmdSet(ecmd *EthtoolCmd, intf string) (uint32, error) {
 	}
 
 	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
-		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+		unix.SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return 0, unix.Errno(ep)
 	}
@@ -168,10 +168,10 @@ func (e *Ethtool) CmdSet(ecmd *EthtoolCmd, intf string) (uint32, error) {
 // CmdGetMapped returns the interface settings in a map
 func (e *Ethtool) CmdGetMapped(intf string) (map[string]uint64, error) {
 	ecmd := EthtoolCmd{
-		Cmd: ETHTOOL_GSET,
+		Cmd: unix.ETHTOOL_GSET,
 	}
 
-	var name [IFNAMSIZ]byte
+	var name [unix.IFNAMSIZ]byte
 	copy(name[:], []byte(intf))
 
 	ifr := ifreq{
@@ -180,7 +180,7 @@ func (e *Ethtool) CmdGetMapped(intf string) (map[string]uint64, error) {
 	}
 
 	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
-		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
+		unix.SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
 	if ep != 0 {
 		return nil, ep
 	}
