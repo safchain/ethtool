@@ -28,9 +28,9 @@ import (
 
 func TestGoString(t *testing.T) {
 	testcases := map[string][]byte{
-		"":      []byte{},
-		"0.5-4": []byte{48, 46, 53, 45, 52, 0, 0, 0},
-		"1.6":   []byte{49, 46, 54, 0, 46, 48, 45, 50, 50, 45, 103, 101, 110, 101, 114, 105, 99},
+		"":      {},
+		"0.5-4": {48, 46, 53, 45, 52, 0, 0, 0},
+		"1.6":   {49, 46, 54, 0, 46, 48, 45, 50, 50, 45, 103, 101, 110, 101, 114, 105, 99},
 	}
 
 	for want, s := range testcases {
@@ -55,7 +55,7 @@ func TestStats(t *testing.T) {
 			continue
 		}
 
-		for _, _ = range stats {
+		for range stats {
 			empty = false
 			break
 		}
