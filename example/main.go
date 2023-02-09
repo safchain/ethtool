@@ -70,6 +70,12 @@ func main() {
 	}
 	fmt.Printf("permaddr: %+v\n", permAddr)
 
+	ts, err := e.GetTimestampingInformation(*name)
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Printf("timestamping information: %+v\n", ts)
+
 	eeprom, err := e.ModuleEepromHex(*name)
 	if err != nil {
 		panic(err.Error())
