@@ -19,10 +19,10 @@
  *
  */
 
-// Package ethtool  aims to provide a library giving a simple access to the
-// Linux SIOCETHTOOL ioctl operations. It can be used to retrieve informations
-// from a network device like statistics, driver related informations or
-// even the peer of a VETH interface.
+// The ethtool package aims to provide a library that provides easy access
+// to the Linux SIOCETHTOOL ioctl operations. It can be used to retrieve information
+// from a network device such as statistics, driver related information or even
+// the peer of a VETH interface.
 package ethtool
 
 import (
@@ -47,12 +47,14 @@ const (
 
 // ethtool stats related constants.
 const (
-	ETH_GSTRING_LEN  = 32
-	ETH_SS_STATS     = 1
-	ETH_SS_FEATURES  = 4
-	ETHTOOL_GDRVINFO = 0x00000003
-	ETHTOOL_GSTRINGS = 0x0000001b
-	ETHTOOL_GSTATS   = 0x0000001d
+	ETH_GSTRING_LEN = 32
+	ETH_SS_STATS    = 1
+	ETH_SS_FEATURES = 4
+
+	// CMD supported
+	ETHTOOL_GDRVINFO = 0x00000003 /* Get driver info. */
+	ETHTOOL_GSTRINGS = 0x0000001b /* get specified string set */
+	ETHTOOL_GSTATS   = 0x0000001d /* get NIC-specific statistics */
 	// other CMDs from ethtool-copy.h of ethtool-3.5 package
 	ETHTOOL_GSET      = 0x00000001 /* Get settings. */
 	ETHTOOL_SSET      = 0x00000002 /* Set settings. */
@@ -66,7 +68,7 @@ const (
 	ETHTOOL_GLINK         = 0x0000000a
 	ETHTOOL_GMODULEINFO   = 0x00000042 /* Get plug-in module information */
 	ETHTOOL_GMODULEEEPROM = 0x00000043 /* Get plug-in module eeprom */
-	ETHTOOL_GPERMADDR     = 0x00000020
+	ETHTOOL_GPERMADDR     = 0x00000020 /* Get permanent hardware address */
 	ETHTOOL_GFEATURES     = 0x0000003a /* Get device offload settings */
 	ETHTOOL_SFEATURES     = 0x0000003b /* Change device offload settings */
 	ETHTOOL_GFLAGS        = 0x00000025 /* Get flags bitmap(ethtool_value) */
