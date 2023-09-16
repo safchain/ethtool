@@ -51,6 +51,7 @@ func main() {
 		panic(err.Error())
 	}
 	fmt.Printf("cmd get: %+v\n", cmdGet)
+	fmt.Printf("max capacity: %+v\n", ethtool.SupportedSpeed(cmdGet["Supported"]))
 
 	msgLvlGet, err := e.MsglvlGet(*name)
 	if err != nil {

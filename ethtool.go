@@ -85,6 +85,36 @@ const (
 	PERMADDR_LEN       = 32
 )
 
+var supportedCapabilities = []struct {
+	name  string
+	mask  uint64
+	speed uint64
+}{
+	{"10baseT_Half", unix.ETHTOOL_LINK_MODE_10baseT_Half_BIT, 10_000_000},
+	{"10baseT_Full", unix.ETHTOOL_LINK_MODE_10baseT_Full_BIT, 10_000_000},
+	{"100baseT_Half", unix.ETHTOOL_LINK_MODE_100baseT_Half_BIT, 100_000_000},
+	{"100baseT_Full", unix.ETHTOOL_LINK_MODE_100baseT_Full_BIT, 100_000_000},
+	{"1000baseT_Half", unix.ETHTOOL_LINK_MODE_1000baseT_Half_BIT, 1_000_000_000},
+	{"1000baseT_Full", unix.ETHTOOL_LINK_MODE_1000baseT_Full_BIT, 1_000_000_000},
+	{"10000baseT_Full", unix.ETHTOOL_LINK_MODE_10000baseT_Full_BIT, 10_000_000_000},
+	{"2500baseT_Full", unix.ETHTOOL_LINK_MODE_2500baseT_Full_BIT, 2_500_000_000},
+	{"1000baseKX_Full", unix.ETHTOOL_LINK_MODE_1000baseKX_Full_BIT, 1_000_000_000},
+	{"10000baseKX_Full", unix.ETHTOOL_LINK_MODE_10000baseKX4_Full_BIT, 10_000_000_000},
+	{"10000baseKR_Full", unix.ETHTOOL_LINK_MODE_10000baseKR_Full_BIT, 10_000_000_000},
+	{"10000baseR_FEC", unix.ETHTOOL_LINK_MODE_10000baseR_FEC_BIT, 10_000_000_000},
+	{"20000baseMLD2_Full", unix.ETHTOOL_LINK_MODE_20000baseMLD2_Full_BIT, 20_000_000_000},
+	{"20000baseKR2_Full", unix.ETHTOOL_LINK_MODE_20000baseKR2_Full_BIT, 20_000_000_000},
+	{"40000baseKR4_Full", unix.ETHTOOL_LINK_MODE_40000baseKR4_Full_BIT, 40_000_000_000},
+	{"40000baseCR4_Full", unix.ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT, 40_000_000_000},
+	{"40000baseSR4_Full", unix.ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT, 40_000_000_000},
+	{"40000baseLR4_Full", unix.ETHTOOL_LINK_MODE_40000baseLR4_Full_BIT, 40_000_000_000},
+	{"56000baseKR4_Full", unix.ETHTOOL_LINK_MODE_56000baseKR4_Full_BIT, 56_000_000_000},
+	{"56000baseCR4_Full", unix.ETHTOOL_LINK_MODE_56000baseCR4_Full_BIT, 56_000_000_000},
+	{"56000baseSR4_Full", unix.ETHTOOL_LINK_MODE_56000baseSR4_Full_BIT, 56_000_000_000},
+	{"56000baseLR4_Full", unix.ETHTOOL_LINK_MODE_56000baseLR4_Full_BIT, 56_000_000_000},
+	{"25000baseCR_Full", unix.ETHTOOL_LINK_MODE_25000baseCR_Full_BIT, 25_000_000_000},
+}
+
 type ifreq struct {
 	ifr_name [IFNAMSIZ]byte
 	ifr_data uintptr
@@ -797,4 +827,37 @@ func PermAddr(intf string) (string, error) {
 	}
 	defer e.Close()
 	return e.PermAddr(intf)
+}
+
+func supportedSpeeds(mask uint64) (ret []struct {
+	name  string
+	mask  uint64
+	speed uint64
+}) {
+	for _, mode := range supportedCapabilities {
+		if ((1 << mode.mask) & mask) != 0 {
+			ret = append(ret, mode)
+		}
+	}
+	return ret
+}
+
+// SupportedLinkModes returns the names of the link modes supported by the interface.
+func SupportedLinkModes(mask uint64) []string {
+	var ret []string
+	for _, mode := range supportedSpeeds(mask) {
+		ret = append(ret, mode.name)
+	}
+	return ret
+}
+
+// SupportedSpeed returns the maximum capacity of this interface.
+func SupportedSpeed(mask uint64) uint64 {
+	var ret uint64
+	for _, mode := range supportedSpeeds(mask) {
+		if mode.speed > ret {
+			ret = mode.speed
+		}
+	}
+	return ret
 }

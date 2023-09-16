@@ -23,6 +23,7 @@ package ethtool
 
 import (
 	"net"
+	"reflect"
 	"testing"
 )
 
@@ -103,5 +104,21 @@ func TestBusInfo(t *testing.T) {
 
 	if !success {
 		t.Fatal("Unable to retrieve bus info from any interface of this system.")
+	}
+}
+
+func TestSupportedLinkModes(t *testing.T) {
+	var cases = []struct {
+		inputMask uint64
+		expected  []string
+	}{
+		{0b01100010_11101111, []string{"10baseT_Half", "10baseT_Full", "100baseT_Half", "100baseT_Full", "1000baseT_Full"}},
+	}
+
+	for _, testcase := range cases {
+		actual := SupportedLinkModes(testcase.inputMask)
+		if !reflect.DeepEqual(actual, testcase.expected) {
+			t.Error("Expected ", testcase.expected, " got ", actual)
+		}
 	}
 }
