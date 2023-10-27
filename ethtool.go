@@ -92,6 +92,11 @@ const (
 	PERMADDR_LEN       = 32
 )
 
+// ethtool sset_info related constants
+const (
+	MAX_SSET_INFO    = 64
+)
+
 var supportedCapabilities = []struct {
 	name  string
 	mask  uint64
@@ -131,8 +136,8 @@ type ifreq struct {
 type ethtoolSsetInfo struct {
 	cmd       uint32
 	reserved  uint32
-	sset_mask uint32
-	data      uintptr
+	sset_mask uint64
+	data      [MAX_SSET_INFO]uint32
 }
 
 type ethtoolGetFeaturesBlock struct {
@@ -693,13 +698,15 @@ func (e *Ethtool) getNames(intf string, mask int) (map[string]uint, error) {
 	ssetInfo := ethtoolSsetInfo{
 		cmd:       ETHTOOL_GSSET_INFO,
 		sset_mask: 1 << mask,
+		data:      [MAX_SSET_INFO]uint32{},
 	}
 
 	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&ssetInfo))); err != nil {
 		return nil, err
 	}
 
-	length := uint32(ssetInfo.data)
+	/* we only read data on first index because single bit was set in sset_mask(0x10) */
+	length := ssetInfo.data[0]
 	if length == 0 {
 		return map[string]uint{}, nil
 	} else if length > MAX_GSTRINGS {
