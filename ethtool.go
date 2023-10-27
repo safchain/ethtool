@@ -94,7 +94,7 @@ const (
 
 // ethtool sset_info related constants
 const (
-	MAX_SSET_INFO    = 64
+	MAX_SSET_INFO = 64
 )
 
 var supportedCapabilities = []struct {
