@@ -63,6 +63,7 @@ const (
 	* physical port (if there is one) are up (ethtool_value). */
 	ETHTOOL_GLINK         = 0x0000000a
 	ETHTOOL_GCOALESCE     = 0x0000000e /* Get coalesce config */
+	ETHTOOL_SCOALESCE     = 0x0000000f /* Set coalesce config */
 	ETHTOOL_GRINGPARAM    = 0x00000010 /* Get ring parameters */
 	ETHTOOL_SRINGPARAM    = 0x00000011 /* Set ring parameters. */
 	ETHTOOL_GPAUSEPARAM   = 0x00000012 /* Get pause parameters */
@@ -484,6 +485,15 @@ func (e *Ethtool) GetCoalesce(intf string) (Coalesce, error) {
 	return coalesce, nil
 }
 
+// SetCoalesce sets the coalesce config for the given interface name.
+func (e *Ethtool) SetCoalesce(intf string, coalesce Coalesce) (Coalesce, error) {
+	coalesce, err := e.setCoalesce(intf, coalesce)
+	if err != nil {
+		return Coalesce{}, err
+	}
+	return coalesce, nil
+}
+
 // GetTimestampingInformation returns the PTP timestamping information for the given interface name.
 func (e *Ethtool) GetTimestampingInformation(intf string) (TimestampingInformation, error) {
 	ts, err := e.getTimestampingInformation(intf)
@@ -571,6 +581,16 @@ func (e *Ethtool) getCoalesce(intf string) (Coalesce, error) {
 	coalesce := Coalesce{
 		Cmd: ETHTOOL_GCOALESCE,
 	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&coalesce))); err != nil {
+		return Coalesce{}, err
+	}
+
+	return coalesce, nil
+}
+
+func (e *Ethtool) setCoalesce(intf string, coalesce Coalesce) (Coalesce, error) {
+	coalesce.Cmd = ETHTOOL_SCOALESCE
 
 	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&coalesce))); err != nil {
 		return Coalesce{}, err
