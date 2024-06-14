@@ -136,7 +136,7 @@ func TestFeatures(t *testing.T) {
 	}
 
 	if len(feats) == 0 {
-		// TOOD: do we have a sane subset of features we should check?
+		// TOD0: do we have a sane subset of features we should check?
 		t.Fatalf("expected features for loopback interface")
 	}
 
