@@ -964,7 +964,7 @@ func (e *Ethtool) Close() {
 
 // NewEthtool returns a new ethtool handler
 func NewEthtool() (*Ethtool, error) {
-	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, unix.IPPROTO_IP)
+	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM|unix.SOCK_CLOEXEC, unix.IPPROTO_IP)
 	if err != nil {
 		return nil, err
 	}
