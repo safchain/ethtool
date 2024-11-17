@@ -35,7 +35,7 @@ func TestGoString(t *testing.T) {
 	}
 
 	for want, s := range testcases {
-		got := goString(s[:])
+		got := goString(s)
 		if got != want {
 			t.Errorf("String conversion failed, got: %s, want: %s.", got, want)
 		}
