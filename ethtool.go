@@ -63,27 +63,30 @@ const (
 
 	// Get link status for host, i.e. whether the interface *and* the
 	// physical port (if there is one) are up (ethtool_value).
-	ETHTOOL_GLINK         = 0x0000000a
-	ETHTOOL_GCOALESCE     = 0x0000000e /* Get coalesce config */
-	ETHTOOL_SCOALESCE     = 0x0000000f /* Set coalesce config */
-	ETHTOOL_GRINGPARAM    = 0x00000010 /* Get ring parameters */
-	ETHTOOL_SRINGPARAM    = 0x00000011 /* Set ring parameters. */
-	ETHTOOL_GPAUSEPARAM   = 0x00000012 /* Get pause parameters */
-	ETHTOOL_SPAUSEPARAM   = 0x00000013 /* Set pause parameters. */
-	ETHTOOL_GSTRINGS      = 0x0000001b /* Get specified string set */
-	ETHTOOL_GSTATS        = 0x0000001d /* Get NIC-specific statistics */
-	ETHTOOL_GPERMADDR     = 0x00000020 /* Get permanent hardware address */
-	ETHTOOL_GFLAGS        = 0x00000025 /* Get flags bitmap(ethtool_value) */
-	ETHTOOL_GPFLAGS       = 0x00000027 /* Get driver-private flags bitmap */
-	ETHTOOL_SPFLAGS       = 0x00000028 /* Set driver-private flags bitmap */
-	ETHTOOL_GSSET_INFO    = 0x00000037 /* Get string set info */
-	ETHTOOL_GFEATURES     = 0x0000003a /* Get device offload settings */
-	ETHTOOL_SFEATURES     = 0x0000003b /* Change device offload settings */
-	ETHTOOL_GCHANNELS     = 0x0000003c /* Get no of channels */
-	ETHTOOL_SCHANNELS     = 0x0000003d /* Set no of channels */
-	ETHTOOL_GET_TS_INFO   = 0x00000041 /* Get time stamping and PHC info */
-	ETHTOOL_GMODULEINFO   = 0x00000042 /* Get plug-in module information */
-	ETHTOOL_GMODULEEEPROM = 0x00000043 /* Get plug-in module eeprom */
+	ETHTOOL_GLINK            = 0x0000000a
+	ETHTOOL_GCOALESCE        = 0x0000000e /* Get coalesce config */
+	ETHTOOL_SCOALESCE        = 0x0000000f /* Set coalesce config */
+	ETHTOOL_GRINGPARAM       = 0x00000010 /* Get ring parameters */
+	ETHTOOL_SRINGPARAM       = 0x00000011 /* Set ring parameters. */
+	ETHTOOL_GPAUSEPARAM      = 0x00000012 /* Get pause parameters */
+	ETHTOOL_SPAUSEPARAM      = 0x00000013 /* Set pause parameters. */
+	ETHTOOL_GSTRINGS         = 0x0000001b /* Get specified string set */
+	ETHTOOL_GSTATS           = 0x0000001d /* Get NIC-specific statistics */
+	ETHTOOL_GPERMADDR        = 0x00000020 /* Get permanent hardware address */
+	ETHTOOL_GFLAGS           = 0x00000025 /* Get flags bitmap(ethtool_value) */
+	ETHTOOL_GPFLAGS          = 0x00000027 /* Get driver-private flags bitmap */
+	ETHTOOL_SPFLAGS          = 0x00000028 /* Set driver-private flags bitmap */
+	ETHTOOL_GSSET_INFO       = 0x00000037 /* Get string set info */
+	ETHTOOL_GFEATURES        = 0x0000003a /* Get device offload settings */
+	ETHTOOL_SFEATURES        = 0x0000003b /* Change device offload settings */
+	ETHTOOL_GCHANNELS        = 0x0000003c /* Get no of channels */
+	ETHTOOL_SCHANNELS        = 0x0000003d /* Set no of channels */
+	ETHTOOL_GET_TS_INFO      = 0x00000041 /* Get time stamping and PHC info */
+	ETHTOOL_GMODULEINFO      = 0x00000042 /* Get plug-in module information */
+	ETHTOOL_GMODULEEEPROM    = 0x00000043 /* Get plug-in module eeprom */
+	ETHTOOL_GRXFHINDIR       = 0x00000038 /* Get RX flow hash indir'n table */
+	ETHTOOL_SRXFHINDIR       = 0x00000039 /* Set RX flow hash indir'n table */
+	ETH_RXFH_INDIR_NO_CHANGE = 0xFFFFFFFF
 )
 
 // MAX_GSTRINGS maximum number of stats entries that ethtool can
@@ -389,6 +392,22 @@ type Ethtool struct {
 	fd int
 }
 
+// max values for my setup dont know how to make this dynamic
+const MAX_INDIR_SIZE = 256
+const MAX_CORES = 32
+
+type Indir struct {
+	Cmd       uint32
+	Size      uint32
+	RingIndex [MAX_INDIR_SIZE]uint32 // statically definded otherwise crash
+
+}
+
+type SetIndir struct {
+	Equal  uint8             //used to set number of cores
+	Weight [MAX_CORES]uint32 // used to select cores
+}
+
 // Convert zero-terminated array of chars (string in C) to a Go string.
 func goString(s []byte) string {
 	strEnd := bytes.IndexByte(s, 0)
@@ -459,6 +478,36 @@ func (e *Ethtool) DriverInfo(intf string) (DrvInfo, error) {
 	}
 
 	return drvInfo, nil
+}
+
+// GetIndir retrieves the indirection table of the given interface name.
+func (e *Ethtool) GetIndir(intf string) (Indir, error) {
+	indir, err := e.getIndir(intf)
+	if err != nil {
+		return Indir{}, err
+	}
+
+	return indir, nil
+}
+
+// SetIndir sets the indirection table of the given interface from the SetIndir struct
+func (e *Ethtool) SetIndir(intf string, setIndir SetIndir) (Indir, error) {
+
+	if setIndir.Equal != 0 && setIndir.Weight != [MAX_CORES]uint32{0} {
+		return Indir{}, fmt.Errorf("equal and weight options are mutually exclusive")
+	}
+
+	indir, err := e.GetIndir(intf)
+	if err != nil {
+		return Indir{}, err
+	}
+
+	newindir, err := e.setIndir(intf, indir, setIndir)
+	if err != nil {
+		return Indir{}, err
+	}
+
+	return newindir, nil
 }
 
 // GetChannels returns the number of channels for the given interface name.
@@ -584,6 +633,92 @@ func (e *Ethtool) getDriverInfo(intf string) (ethtoolDrvInfo, error) {
 	}
 
 	return drvinfo, nil
+}
+
+// parsing of do_grxfhindir from ethtool.c
+func (e *Ethtool) getIndir(intf string) (Indir, error) {
+	indir_head := Indir{
+		Cmd:  ETHTOOL_GRXFHINDIR,
+		Size: 0,
+	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&indir_head))); err != nil {
+		return Indir{}, err
+	}
+
+	indir := Indir{
+		Cmd:  ETHTOOL_GRXFHINDIR,
+		Size: indir_head.Size,
+	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&indir))); err != nil {
+		return Indir{}, err
+	}
+
+	return indir, nil
+}
+
+// parsing of do_srxfhindir from ethtool.c
+func (e *Ethtool) setIndir(intf string, indir Indir, setIndir SetIndir) (Indir, error) {
+
+	err := fillIndirTable(&indir.Size, indir.RingIndex[:], 0, 0, int(setIndir.Equal), setIndir.Weight, MAX_CORES)
+	if err != nil {
+		return Indir{}, err
+	}
+
+	if indir.Size == ETH_RXFH_INDIR_NO_CHANGE {
+		indir.Size = MAX_INDIR_SIZE
+		return indir, nil
+	}
+
+	indir.Cmd = ETHTOOL_SRXFHINDIR
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&indir))); err != nil {
+		return Indir{}, err
+	}
+
+	return indir, nil
+}
+
+func fillIndirTable(indirSize *uint32, indir []uint32, rxfhindirDefault int,
+	rxfhindirStart int, rxfhindirEqual int, rxfhindirWeight [MAX_CORES]uint32,
+	numWeights uint32) error {
+
+	if rxfhindirEqual != 0 {
+		for i := uint32(0); i < *indirSize; i++ {
+			indir[i] = uint32(rxfhindirStart) + (i % uint32(rxfhindirEqual))
+		}
+	} else if rxfhindirWeight != [MAX_CORES]uint32{0} {
+		var sum, partial, j, weight uint32 = 0, 0, 0, 0
+
+		for j = 0; j < numWeights; j++ {
+			weight = rxfhindirWeight[j]
+			sum += weight
+		}
+
+		if sum == 0 {
+			return fmt.Errorf("at least one weight must be non-zero")
+		}
+
+		if sum > *indirSize {
+			return fmt.Errorf("total weight exceeds the size of the indirection table")
+		}
+
+		j = ^uint32(0) // equivalent to -1 for unsigned
+		for i := uint32(0); i < *indirSize; i++ {
+			for i >= (*indirSize*partial)/sum {
+				j++
+				weight = rxfhindirWeight[j]
+				partial += weight
+			}
+			indir[i] = uint32(rxfhindirStart) + j
+		}
+	} else if rxfhindirDefault != 0 {
+		*indirSize = 0
+	} else {
+		*indirSize = ETH_RXFH_INDIR_NO_CHANGE
+	}
+
+	return nil
 }
 
 func (e *Ethtool) getChannels(intf string) (Channels, error) {
