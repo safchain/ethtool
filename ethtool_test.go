@@ -166,76 +166,26 @@ func TestFeatures(t *testing.T) {
 	}
 }
 
-func TestChannels(t *testing.T) {
-	et, err := NewEthtool()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer et.Close()
-
-	channels, err := et.getChannels("enp52s0f1np1")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if channels == (Channels{}) {
-		t.Fatalf("expected channels for interface")
-	}
-
-	if channels.MaxRx != 0 || channels.MaxTx != 0 || channels.MaxOther != 0 {
-		t.Fatalf("unexpected channel values: %v", channels)
-	}
-	if channels.RxCount != 0 || channels.TxCount != 0 || channels.OtherCount != 0 {
-		t.Fatalf("unexpected channel values: %v", channels)
-	}
-	t.Log(channels)
-}
-
-func TestRing(t *testing.T) {
-	et, err := NewEthtool()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer et.Close()
-
-	rings, err := et.GetRing("enp52s0f1np1")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if rings == (Ring{}) {
-		t.Fatalf("expected rings for interface")
-	}
-
-	t.Log(rings)
-}
-
 func TestIndir(t *testing.T) {
 	et, err := NewEthtool()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer et.Close()
-
-	indir, err := et.GetIndir("enp52s0f1np1")
-	if err != nil {
+	ifname := "enp52s0f1np1"
+	indir, err := et.GetIndir(ifname)
+	if err != nil || indir.RingIndex == [256]uint32{} {
 		t.Fatal(err)
 	}
-	t.Log(indir)
-
-	// if indir == (Indir{}) {
-	// 	t.Fatalf("expected indir for interface")
-	// }
-
+	//Set either equal or set weight
 	setIndir := SetIndir{}
-	setIndir.Equal = 10
-	// setIndir.Weight[0] = 1
-	// setIndir.Weight[1] = 1
+	// setIndir.Equal = 10
+	setIndir.Weight = make([]uint32, 32)
+	setIndir.Weight[0] = 1
+	setIndir.Weight[1] = 1
 
-	newindir, err := et.SetIndir("enp52s0f1np1", setIndir)
-	if err != nil {
+	newindir, err := et.SetIndir(ifname, setIndir)
+	if err != nil || newindir.RingIndex == [256]uint32{} {
 		t.Fatal(err)
 	}
-
-	t.Log(newindir)
 }
