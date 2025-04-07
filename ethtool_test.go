@@ -172,7 +172,9 @@ func TestIndir(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer et.Close()
+	// Set with your interface name
 	ifname := "enp52s0f1np1"
+
 	indir, err := et.GetIndir(ifname)
 	if err != nil || indir.RingIndex == [256]uint32{} {
 		t.Fatal(err)
