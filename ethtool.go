@@ -404,8 +404,8 @@ type Indir struct {
 }
 
 type SetIndir struct {
-	Equal  uint8             //used to set number of cores
-	Weight [MAX_CORES]uint32 // used to select cores
+	Equal  uint8    //used to set number of cores
+	Weight []uint32 // used to select cores
 }
 
 // Convert zero-terminated array of chars (string in C) to a Go string.
@@ -493,7 +493,7 @@ func (e *Ethtool) GetIndir(intf string) (Indir, error) {
 // SetIndir sets the indirection table of the given interface from the SetIndir struct
 func (e *Ethtool) SetIndir(intf string, setIndir SetIndir) (Indir, error) {
 
-	if setIndir.Equal != 0 && setIndir.Weight != [MAX_CORES]uint32{0} {
+	if setIndir.Equal != 0 && setIndir.Weight != nil {
 		return Indir{}, fmt.Errorf("equal and weight options are mutually exclusive")
 	}
 
@@ -661,7 +661,7 @@ func (e *Ethtool) getIndir(intf string) (Indir, error) {
 // parsing of do_srxfhindir from ethtool.c
 func (e *Ethtool) setIndir(intf string, indir Indir, setIndir SetIndir) (Indir, error) {
 
-	err := fillIndirTable(&indir.Size, indir.RingIndex[:], 0, 0, int(setIndir.Equal), setIndir.Weight, MAX_CORES)
+	err := fillIndirTable(&indir.Size, indir.RingIndex[:], 0, 0, int(setIndir.Equal), setIndir.Weight, uint32(len(setIndir.Weight)))
 	if err != nil {
 		return Indir{}, err
 	}
@@ -680,14 +680,14 @@ func (e *Ethtool) setIndir(intf string, indir Indir, setIndir SetIndir) (Indir, 
 }
 
 func fillIndirTable(indirSize *uint32, indir []uint32, rxfhindirDefault int,
-	rxfhindirStart int, rxfhindirEqual int, rxfhindirWeight [MAX_CORES]uint32,
+	rxfhindirStart int, rxfhindirEqual int, rxfhindirWeight []uint32,
 	numWeights uint32) error {
 
 	if rxfhindirEqual != 0 {
 		for i := uint32(0); i < *indirSize; i++ {
 			indir[i] = uint32(rxfhindirStart) + (i % uint32(rxfhindirEqual))
 		}
-	} else if rxfhindirWeight != [MAX_CORES]uint32{0} {
+	} else if rxfhindirWeight != nil {
 		var sum, partial, j, weight uint32 = 0, 0, 0, 0
 
 		for j = 0; j < numWeights; j++ {
