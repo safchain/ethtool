@@ -426,7 +426,7 @@ func (e *Ethtool) ModuleEeprom(intf string) ([]byte, error) {
 	return eeprom.data[:eeprom.len], nil
 }
 
-// ModuleEeprom returns Eeprom information of the given interface name.
+// ModuleEepromHex returns Eeprom information as hexadecimal string
 func (e *Ethtool) ModuleEepromHex(intf string) (string, error) {
 	eeprom, _, err := e.getModuleEeprom(intf)
 	if err != nil {
