@@ -30,6 +30,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -71,6 +72,7 @@ const (
 	ETHTOOL_GPAUSEPARAM      = 0x00000012 /* Get pause parameters */
 	ETHTOOL_SPAUSEPARAM      = 0x00000013 /* Set pause parameters. */
 	ETHTOOL_GSTRINGS         = 0x0000001b /* Get specified string set */
+	ETHTOOL_PHYS_ID          = 0x0000001c /* Identify the NIC */
 	ETHTOOL_GSTATS           = 0x0000001d /* Get NIC-specific statistics */
 	ETHTOOL_GPERMADDR        = 0x00000020 /* Get permanent hardware address */
 	ETHTOOL_GFLAGS           = 0x00000025 /* Get flags bitmap(ethtool_value) */
@@ -101,6 +103,10 @@ const (
 // ethtool sset_info related constants
 const (
 	MAX_SSET_INFO = 64
+)
+
+const (
+	DEFAULT_BLINK_DURATION = 60 * time.Second
 )
 
 type ifreq struct {
@@ -210,6 +216,12 @@ type Coalesce struct {
 	TxCoalesceUsecsHigh      uint32
 	TxMaxCoalescedFramesHigh uint32
 	RateSampleInterval       uint32
+}
+
+// IdentityConf is an identity config for an interface
+type IdentityConf struct {
+	Cmd      uint32
+	Duration uint32
 }
 
 // WoL options
@@ -1159,6 +1171,20 @@ func (e *Ethtool) Close() {
 	unix.Close(e.fd)
 }
 
+// Identity the nic with blink duration, if not specify blink for 60 seconds
+func (e *Ethtool) Identity(intf string, duration *time.Duration) error {
+	dur := uint32(DEFAULT_BLINK_DURATION.Seconds())
+	if duration != nil {
+		dur = uint32(duration.Seconds())
+	}
+	return e.identity(intf, IdentityConf{Duration: dur})
+}
+
+func (e *Ethtool) identity(intf string, identity IdentityConf) error {
+	identity.Cmd = ETHTOOL_PHYS_ID
+	return e.ioctl(intf, uintptr(unsafe.Pointer(&identity)))
+}
+
 // NewEthtool returns a new ethtool handler
 func NewEthtool() (*Ethtool, error) {
 	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM|unix.SOCK_CLOEXEC, unix.IPPROTO_IP)
@@ -1209,6 +1235,16 @@ func PermAddr(intf string) (string, error) {
 	}
 	defer e.Close()
 	return e.PermAddr(intf)
+}
+
+// Identity the nic with blink duration, if not specify blink infinity
+func Identity(intf string, duration *time.Duration) error {
+	e, err := NewEthtool()
+	if err != nil {
+		return err
+	}
+	defer e.Close()
+	return e.Identity(intf, duration)
 }
 
 func supportedSpeeds(mask uint64) (ret []struct {
