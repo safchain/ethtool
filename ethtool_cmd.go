@@ -126,7 +126,7 @@ func (e *Ethtool) CmdGet(ecmd *EthtoolCmd, intf string) (uint32, error) {
 		return 0, ep
 	}
 
-	var speedval uint32 = (uint32(ecmd.Speed_hi) << 16) |
+	var speedval = (uint32(ecmd.Speed_hi) << 16) |
 		(uint32(ecmd.Speed) & 0xffff)
 	if speedval == math.MaxUint16 {
 		speedval = math.MaxUint32
@@ -154,7 +154,7 @@ func (e *Ethtool) CmdSet(ecmd *EthtoolCmd, intf string) (uint32, error) {
 		return 0, unix.Errno(ep)
 	}
 
-	var speedval uint32 = (uint32(ecmd.Speed_hi) << 16) |
+	var speedval = (uint32(ecmd.Speed_hi) << 16) |
 		(uint32(ecmd.Speed) & 0xffff)
 	if speedval == math.MaxUint16 {
 		speedval = math.MaxUint32
@@ -189,7 +189,7 @@ func (e *Ethtool) CmdGetMapped(intf string) (map[string]uint64, error) {
 	// Golang Reflection Example
 	ecmd.reflect(&result)
 
-	var speedval uint32 = (uint32(ecmd.Speed_hi) << 16) |
+	var speedval = (uint32(ecmd.Speed_hi) << 16) |
 		(uint32(ecmd.Speed) & 0xffff)
 	result["speed"] = uint64(speedval)
 
