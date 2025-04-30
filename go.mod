@@ -1,5 +1,5 @@
 module github.com/safchain/ethtool
 
-go 1.16
+go 1.24.2
 
-require golang.org/x/sys v0.29.0
+require golang.org/x/sys v0.32.0
