@@ -404,7 +404,7 @@ type Indir struct {
 }
 
 type SetIndir struct {
-	Equal  uint8    //used to set number of cores
+	Equal  uint8    // used to set number of cores
 	Weight []uint32 // used to select cores
 }
 
@@ -683,14 +683,15 @@ func fillIndirTable(indirSize *uint32, indir []uint32, rxfhindirDefault int,
 	rxfhindirStart int, rxfhindirEqual int, rxfhindirWeight []uint32,
 	numWeights uint32) error {
 
-	if rxfhindirEqual != 0 {
+	switch {
+	case rxfhindirEqual != 0:
 		for i := uint32(0); i < *indirSize; i++ {
 			indir[i] = uint32(rxfhindirStart) + (i % uint32(rxfhindirEqual))
 		}
-	} else if rxfhindirWeight != nil {
-		var sum, partial, j, weight uint32 = 0, 0, 0, 0
-
-		for j = 0; j < numWeights; j++ {
+	case rxfhindirWeight != nil:
+		var sum, partial uint32 = 0, 0
+		var j, weight uint32
+		for j = range numWeights {
 			weight = rxfhindirWeight[j]
 			sum += weight
 		}
@@ -712,12 +713,11 @@ func fillIndirTable(indirSize *uint32, indir []uint32, rxfhindirDefault int,
 			}
 			indir[i] = uint32(rxfhindirStart) + j
 		}
-	} else if rxfhindirDefault != 0 {
+	case rxfhindirDefault != 0:
 		*indirSize = 0
-	} else {
+	default:
 		*indirSize = ETH_RXFH_INDIR_NO_CHANGE
 	}
-
 	return nil
 }
 

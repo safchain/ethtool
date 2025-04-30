@@ -179,7 +179,7 @@ func TestIndir(t *testing.T) {
 	if err != nil || indir.RingIndex == [256]uint32{} {
 		t.Fatal(err)
 	}
-	//Set either equal or set weight
+	// Set either equal or set weight
 	setIndir := SetIndir{}
 	// setIndir.Equal = 10
 	setIndir.Weight = make([]uint32, 32)
