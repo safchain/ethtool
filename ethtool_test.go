@@ -165,29 +165,3 @@ func TestFeatures(t *testing.T) {
 		t.Fatalf("loopback interface reported all features available")
 	}
 }
-
-func TestIndir(t *testing.T) {
-	et, err := NewEthtool()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer et.Close()
-	// Set with your interface name
-	ifname := "enp52s0f1np1"
-
-	indir, err := et.GetIndir(ifname)
-	if err != nil || indir.RingIndex == [256]uint32{} {
-		t.Fatal(err)
-	}
-	// Set either equal or set weight
-	setIndir := SetIndir{}
-	// setIndir.Equal = 10
-	setIndir.Weight = make([]uint32, 32)
-	setIndir.Weight[0] = 1
-	setIndir.Weight[1] = 1
-
-	newindir, err := et.SetIndir(ifname, setIndir)
-	if err != nil || newindir.RingIndex == [256]uint32{} {
-		t.Fatal(err)
-	}
-}
