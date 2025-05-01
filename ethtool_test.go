@@ -165,3 +165,27 @@ func TestFeatures(t *testing.T) {
 		t.Fatalf("loopback interface reported all features available")
 	}
 }
+
+func TestIdentity(t *testing.T) {
+	if testing.Short() {
+		return
+	}
+	intfs, err := net.Interfaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// we expected to have at least one success
+	empty := true
+	for _, intf := range intfs {
+		err := Identity(intf.Name, nil)
+		if err != nil {
+			continue
+		}
+		empty = false
+	}
+
+	if empty {
+		t.Fatal("Unable to identity any interface of this system.")
+	}
+}
