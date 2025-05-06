@@ -1,6 +1,7 @@
 package ethtool
 
 import (
+	"errors"
 	"net"
 	"reflect"
 	"sort"
@@ -38,8 +39,9 @@ func TestGetLinkSettings(t *testing.T) {
 		// or a specific error like EOPNOTSUPP if the interface/driver
 		// doesn't support either GLINKSETTINGS or GSET.
 		if err != nil {
-			if errno, ok := err.(syscall.Errno); ok {
-				if errno == unix.EOPNOTSUPP {
+			var errno syscall.Errno
+			if errors.As(err, &errno) {
+				if errors.Is(errno, unix.EOPNOTSUPP) {
 					// This is an expected outcome for some interfaces/drivers
 					t.Logf("GetLinkSettings for '%s' returned EOPNOTSUPP (expected for some devices)", intfName)
 				} else {
@@ -57,7 +59,7 @@ func TestGetLinkSettings(t *testing.T) {
 				// Cannot continue checks if settings is nil
 				continue
 			}
-			if settings.Source != "GLINKSETTINGS" && settings.Source != "GSET" {
+			if settings.Source != SourceGLinkSettings && settings.Source != SourceGSet {
 				t.Errorf("GetLinkSettings for '%s' succeeded but Source ('%s') is invalid", intfName, settings.Source)
 			}
 			t.Logf("GetLinkSettings for '%s' succeeded (Source: %s). Settings: %+v", intfName, settings.Source, settings)
@@ -70,7 +72,7 @@ func TestGetLinkSettings(t *testing.T) {
 			}
 
 			// If source was GSET, verify the conversion logic
-			if settings.Source == "GSET" {
+			if settings.Source == SourceGSet {
 				var cmd EthtoolCmd
 				_, errGet := e.CmdGet(&cmd, intfName)
 				if errGet != nil {

@@ -1,6 +1,7 @@
 package ethtool
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -8,6 +9,14 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/unix"
+)
+
+type LinkSettingSource string
+
+// Constants defining the source of the LinkSettings data
+const (
+	SourceGLinkSettings LinkSettingSource = "GLINKSETTINGS"
+	SourceGSet          LinkSettingSource = "GSET"
 )
 
 // EthtoolLinkSettingsFixed corresponds to struct ethtool_link_settings fixed part
@@ -52,7 +61,7 @@ type LinkSettings struct {
 	SupportedLinkModes   []string
 	AdvertisingLinkModes []string
 	LpAdvertisingModes   []string
-	Source               string // "GSET" or "GLINKSETTINGS"
+	Source               LinkSettingSource // "GSET" or "GLINKSETTINGS"
 }
 
 // GetLinkSettings retrieves link settings, preferring ETHTOOL_GLINKSETTINGS and falling back to ETHTOOL_GSET.
@@ -65,21 +74,20 @@ func (e *Ethtool) GetLinkSettings(intf string) (*LinkSettings, error) {
 	req.Settings.LinkModeMasksNwords = int8(MAX_LINK_MODE_MASK_NWORDS)
 
 	err := e.ioctl(intf, uintptr(unsafe.Pointer(&req)))
-	attemptFallback := false
 	fallbackReason := ""
 
-	// Condition 1: ioctl returned EOPNOTSUPP
-	if errno, ok := err.(syscall.Errno); ok && errno == unix.EOPNOTSUPP {
-		attemptFallback = true
+	var errno syscall.Errno
+	switch {
+	case errors.As(err, &errno) && errors.Is(errno, unix.EOPNOTSUPP):
+		// Condition 1: ioctl returned EOPNOTSUPP
 		fallbackReason = "EOPNOTSUPP"
-	} else if err == nil {
+	case err == nil:
 		// Condition 2: ioctl succeeded, but nwords might be invalid or buffer too small
 		nwords := int(req.Settings.LinkModeMasksNwords)
 		switch {
 		case nwords <= 0 || nwords > MAX_LINK_MODE_MASK_NWORDS:
 			// Sub-case 2a: Invalid nwords -> fallback
 			fmt.Printf("Warning: GLINKSETTINGS succeeded but returned invalid nwords (%d), attempting fallback to GSET\n", nwords)
-			attemptFallback = true
 			fallbackReason = "invalid nwords from GLINKSETTINGS"
 		case 3*nwords > len(req.Masks):
 			// Sub-case 2b: Buffer too small -> error
@@ -101,34 +109,25 @@ func (e *Ethtool) GetLinkSettings(intf string) (*LinkSettings, error) {
 				SupportedLinkModes:   parseLinkModeMasks(req.Masks[0*nwords : 1*nwords]),
 				AdvertisingLinkModes: parseLinkModeMasks(req.Masks[1*nwords : 2*nwords]),
 				LpAdvertisingModes:   parseLinkModeMasks(req.Masks[2*nwords : 3*nwords]),
-				Source:               "GLINKSETTINGS",
-			}
-			if results.Speed == SPEED_UNKNOWN {
-				results.Speed = 0
+				Source:               SourceGLinkSettings,
 			}
 			return results, nil
 		}
-	} else if err != nil {
+	default:
 		// Condition 3: ioctl failed with an error other than EOPNOTSUPP
 		// No fallback in this case.
 		return nil, fmt.Errorf("ETHTOOL_GLINKSETTINGS ioctl failed: %w", err)
 	}
 
-	// If we reach here, it means attemptFallback is true
-	if attemptFallback {
-		// Fallback to ETHTOOL_GSET using e.CmdGet
-		var cmd EthtoolCmd
-		_, errGet := e.CmdGet(&cmd, intf)
-		if errGet != nil {
-			return nil, fmt.Errorf("ETHTOOL_GLINKSETTINGS failed (%s), fallback ETHTOOL_GSET (CmdGet) also failed: %w", fallbackReason, errGet)
-		}
-		results := convertCmdToLinkSettings(&cmd)
-		results.Source = "GSET"
-		return results, nil
+	// Fallback to ETHTOOL_GSET using e.CmdGet
+	var cmd EthtoolCmd
+	_, errGet := e.CmdGet(&cmd, intf)
+	if errGet != nil {
+		return nil, fmt.Errorf("ETHTOOL_GLINKSETTINGS failed (%s), fallback ETHTOOL_GSET (CmdGet) also failed: %w", fallbackReason, errGet)
 	}
-
-	// Should be unreachable if logic is exhaustive
-	return nil, fmt.Errorf("unexpected state at end of GetLinkSettings")
+	results := convertCmdToLinkSettings(&cmd)
+	results.Source = SourceGSet
+	return results, nil
 }
 
 // SetLinkSettings applies link settings, determining whether to use ETHTOOL_SLINKSETTINGS or ETHTOOL_SSET.
@@ -147,10 +146,11 @@ func (e *Ethtool) SetLinkSettings(intf string, settings *LinkSettings) error {
 			return fmt.Errorf("ETHTOOL_GLINKSETTINGS check succeeded but returned invalid nwords: %d", nwords)
 		}
 		canUseGLinkSettings = true
-	} else if errno, ok := errGLinkSettings.(syscall.Errno); ok && errno == unix.EOPNOTSUPP {
-		canUseGLinkSettings = false
 	} else {
-		return fmt.Errorf("checking support via ETHTOOL_GLINKSETTINGS failed: %w", errGLinkSettings)
+		var errno syscall.Errno
+		if !errors.As(errGLinkSettings, &errno) || !errors.Is(errno, unix.EOPNOTSUPP) {
+			return fmt.Errorf("checking support via ETHTOOL_GLINKSETTINGS failed: %w", errGLinkSettings)
+		}
 	}
 
 	if canUseGLinkSettings {
@@ -183,37 +183,36 @@ func (e *Ethtool) SetLinkSettings(intf string, settings *LinkSettings) error {
 		}
 		return nil
 
-	} else {
-		// Check if trying to set high bits when only SSET is available
-		advertisingMaskCheck := buildLinkModeMask(settings.AdvertisingLinkModes, MAX_LINK_MODE_MASK_NWORDS)
-		for i := 1; i < len(advertisingMaskCheck); i++ {
-			if advertisingMaskCheck[i] != 0 {
-				return fmt.Errorf("cannot set link modes beyond 32 bits using legacy ETHTOOL_SSET; device does not support ETHTOOL_SLINKSETTINGS")
-			}
-		}
-
-		// Fallback to SSET
-		cmd := convertLinkSettingsToCmd(settings)
-		_, errSet := e.CmdSet(cmd, intf)
-		if errSet != nil {
-			return fmt.Errorf("ETHTOOL_SLINKSETTINGS not supported, fallback ETHTOOL_SSET (CmdSet) failed: %w", errSet)
-		}
-		return nil
 	}
+	// Check if trying to set high bits when only SSET is available
+	advertisingMaskCheck := buildLinkModeMask(settings.AdvertisingLinkModes, MAX_LINK_MODE_MASK_NWORDS)
+	for i := 1; i < len(advertisingMaskCheck); i++ {
+		if advertisingMaskCheck[i] != 0 {
+			return fmt.Errorf("cannot set link modes beyond 32 bits using legacy ETHTOOL_SSET; device does not support ETHTOOL_SLINKSETTINGS")
+		}
+	}
+
+	// Fallback to SSET
+	cmd := convertLinkSettingsToCmd(settings)
+	_, errSet := e.CmdSet(cmd, intf)
+	if errSet != nil {
+		return fmt.Errorf("ETHTOOL_SLINKSETTINGS not supported, fallback ETHTOOL_SSET (CmdSet) failed: %w", errSet)
+	}
+	return nil
 }
 
 // parseLinkModeMasks converts a slice of uint32 bitmasks to a list of mode names.
 // It filters out non-speed/duplex modes (like TP, Autoneg, Pause).
 func parseLinkModeMasks(mask []uint32) []string {
-	modes := []string{}
-	for _, cap := range supportedCapabilities {
+	modes := make([]string, 0, 8)
+	for _, capability := range supportedCapabilities {
 		// Only include capabilities that represent a speed/duplex mode
-		if cap.speed > 0 {
-			bitIndex := int(cap.mask)
+		if capability.speed > 0 {
+			bitIndex := int(capability.mask)
 			wordIndex := bitIndex / 32
 			bitInWord := uint(bitIndex % 32)
 			if wordIndex < len(mask) && (mask[wordIndex]>>(bitInWord))&1 != 0 {
-				modes = append(modes, cap.name)
+				modes = append(modes, capability.name)
 			}
 		}
 	}
@@ -231,13 +230,13 @@ func buildLinkModeMask(modes []string, nwords int) []uint32 {
 		bitIndex int
 		speed    uint64
 	})
-	for _, cap := range supportedCapabilities {
+	for _, capability := range supportedCapabilities {
 		// Only consider capabilities that represent a speed/duplex mode
-		if cap.speed > 0 {
-			modeMap[cap.name] = struct {
+		if capability.speed > 0 {
+			modeMap[capability.name] = struct {
 				bitIndex int
 				speed    uint64
-			}{bitIndex: int(cap.mask), speed: cap.speed}
+			}{bitIndex: int(capability.mask), speed: capability.speed}
 		}
 	}
 	for _, modeName := range modes {
@@ -245,15 +244,15 @@ func buildLinkModeMask(modes []string, nwords int) []uint32 {
 			wordIndex := info.bitIndex / 32
 			bitInWord := uint(info.bitIndex % 32)
 			if wordIndex < nwords {
-				mask[wordIndex] |= (1 << bitInWord)
+				mask[wordIndex] |= 1 << bitInWord
 			} else {
 				fmt.Printf("Warning: Link mode '%s' (bit %d) exceeds device's mask size (%d words)\n", modeName, info.bitIndex, nwords)
 			}
 		} else {
 			// Check if the user provided a non-speed mode name - ignore it for the mask, maybe warn?
 			isKnownNonSpeed := false
-			for _, cap := range supportedCapabilities {
-				if cap.speed == 0 && cap.name == strings.TrimSpace(modeName) {
+			for _, capability := range supportedCapabilities {
+				if capability.speed == 0 && capability.name == strings.TrimSpace(modeName) {
 					isKnownNonSpeed = true
 					break
 				}
@@ -285,9 +284,7 @@ func convertCmdToLinkSettings(cmd *EthtoolCmd) *LinkSettings {
 		LpAdvertisingModes:   parseLegacyLinkModeMask(cmd.Lp_advertising),
 	}
 	if cmd.Speed == math.MaxUint16 && cmd.Speed_hi == math.MaxUint16 {
-		ls.Speed = 0 // GSET uses 0xFFFF/0xFFFF for unknown/auto
-	} else if ls.Speed == SPEED_UNKNOWN {
-		ls.Speed = 0 // Also treat GLINKSETTINGS' unknown as 0 for consistency?
+		ls.Speed = SPEED_UNKNOWN // GSET uses 0xFFFF/0xFFFF for unknown/auto
 	}
 	return ls
 }
