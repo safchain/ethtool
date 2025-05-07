@@ -29,7 +29,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"strings"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -141,6 +141,23 @@ const (
 
 const (
 	DEFAULT_BLINK_DURATION = 60 * time.Second
+)
+
+var (
+	gstringsPool = sync.Pool{
+		New: func() interface{} {
+			// new() will allocate and zero-initialize the struct.
+			// The large data array within ethtoolGStrings will be zeroed.
+			return new(ethtoolGStrings)
+		},
+	}
+	statsPool = sync.Pool{
+		New: func() interface{} {
+			// new() will allocate and zero-initialize the struct.
+			// The large data array within ethtoolStats will be zeroed.
+			return new(ethtoolStats)
+		},
+	}
 )
 
 type ifreq struct {
@@ -1159,41 +1176,43 @@ func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
 		return nil, err
 	}
 
-	if drvinfo.n_stats*ETH_GSTRING_LEN > MAX_GSTRINGS*ETH_GSTRING_LEN {
+	if drvinfo.n_stats > MAX_GSTRINGS {
 		return nil, fmt.Errorf("ethtool currently doesn't support more than %d entries, received %d", MAX_GSTRINGS, drvinfo.n_stats)
 	}
 
-	gstrings := ethtoolGStrings{
-		cmd:        ETHTOOL_GSTRINGS,
-		string_set: ETH_SS_STATS,
-		len:        drvinfo.n_stats,
-		data:       [MAX_GSTRINGS * ETH_GSTRING_LEN]byte{},
-	}
+	gstringsPtr := gstringsPool.Get().(*ethtoolGStrings)
+	defer gstringsPool.Put(gstringsPtr)
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&gstrings))); err != nil {
+	gstringsPtr.cmd = ETHTOOL_GSTRINGS
+	gstringsPtr.string_set = ETH_SS_STATS
+	gstringsPtr.len = drvinfo.n_stats
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(gstringsPtr))); err != nil {
 		return nil, err
 	}
 
-	stats := ethtoolStats{
-		cmd:     ETHTOOL_GSTATS,
-		n_stats: drvinfo.n_stats,
-		data:    [MAX_GSTRINGS]uint64{},
-	}
+	statsPtr := statsPool.Get().(*ethtoolStats)
+	defer statsPool.Put(statsPtr)
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&stats))); err != nil {
+	statsPtr.cmd = ETHTOOL_GSTATS
+	statsPtr.n_stats = drvinfo.n_stats
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(statsPtr))); err != nil {
 		return nil, err
 	}
 
-	result := make(map[string]uint64)
+	result := make(map[string]uint64, drvinfo.n_stats)
 	for i := 0; i != int(drvinfo.n_stats); i++ {
-		b := gstrings.data[i*ETH_GSTRING_LEN : i*ETH_GSTRING_LEN+ETH_GSTRING_LEN]
-		strEnd := strings.Index(string(b), "\x00")
+		b := gstringsPtr.data[i*ETH_GSTRING_LEN : (i+1)*ETH_GSTRING_LEN]
+
+		strEnd := bytes.IndexByte(b, 0)
 		if strEnd == -1 {
 			strEnd = ETH_GSTRING_LEN
 		}
 		key := string(b[:strEnd])
+
 		if len(key) != 0 {
-			result[key] = stats.data[i]
+			result[key] = statsPtr.data[i]
 		}
 	}
 

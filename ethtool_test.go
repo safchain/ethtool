@@ -189,3 +189,23 @@ func TestIdentity(t *testing.T) {
 		t.Fatal("Unable to identity any interface of this system.")
 	}
 }
+
+func BenchmarkStats(b *testing.B) {
+	intfs, err := net.Interfaces()
+	if err != nil {
+		b.Fatal(err)
+	}
+	for _, intf := range intfs {
+		if intf.Name == "lo" {
+			continue
+		}
+		b.Run(intf.Name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, err := Stats(intf.Name)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
