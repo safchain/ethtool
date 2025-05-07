@@ -82,4 +82,10 @@ func main() {
 		panic(err.Error())
 	}
 	fmt.Printf("module eeprom: %+v\n", eeprom)
+
+	linkSettings, err := e.GetLinkSettings(*name)
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Printf("link settings: %+v\n", linkSettings)
 }

@@ -54,13 +54,15 @@ const (
 	ETH_SS_FEATURES   = 4
 
 	// CMD supported
-	ETHTOOL_GSET     = 0x00000001 /* Get settings. */
-	ETHTOOL_SSET     = 0x00000002 /* Set settings. */
-	ETHTOOL_GWOL     = 0x00000005 /* Get wake-on-lan options. */
-	ETHTOOL_SWOL     = 0x00000006 /* Set wake-on-lan options. */
-	ETHTOOL_GDRVINFO = 0x00000003 /* Get driver info. */
-	ETHTOOL_GMSGLVL  = 0x00000007 /* Get driver message level */
-	ETHTOOL_SMSGLVL  = 0x00000008 /* Set driver msg level. */
+	ETHTOOL_GSET          = 0x00000001                 /* Get settings. */
+	ETHTOOL_SSET          = 0x00000002                 /* Set settings. */
+	ETHTOOL_GWOL          = 0x00000005                 /* Get wake-on-lan options. */
+	ETHTOOL_SWOL          = 0x00000006                 /* Set wake-on-lan options. */
+	ETHTOOL_GDRVINFO      = 0x00000003                 /* Get driver info. */
+	ETHTOOL_GMSGLVL       = 0x00000007                 /* Get driver message level */
+	ETHTOOL_SMSGLVL       = 0x00000008                 /* Set driver msg level. */
+	ETHTOOL_GLINKSETTINGS = unix.ETHTOOL_GLINKSETTINGS // 0x4c
+	ETHTOOL_SLINKSETTINGS = unix.ETHTOOL_SLINKSETTINGS // 0x4d
 
 	// Get link status for host, i.e. whether the interface *and* the
 	// physical port (if there is one) are up (ethtool_value).
@@ -89,6 +91,38 @@ const (
 	ETHTOOL_GRXFHINDIR       = 0x00000038 /* Get RX flow hash indir'n table */
 	ETHTOOL_SRXFHINDIR       = 0x00000039 /* Set RX flow hash indir'n table */
 	ETH_RXFH_INDIR_NO_CHANGE = 0xFFFFFFFF
+
+	// Speed and Duplex unknowns/constants (Manually defined based on <linux/ethtool.h>)
+	SPEED_UNKNOWN  = 0xffffffff // ((__u32)-1) SPEED_UNKNOWN
+	DUPLEX_HALF    = 0x00       // DUPLEX_HALF
+	DUPLEX_FULL    = 0x01       // DUPLEX_FULL
+	DUPLEX_UNKNOWN = 0xff       // DUPLEX_UNKNOWN
+
+	// Port types (Manually defined based on <linux/ethtool.h>)
+	PORT_TP    = 0x00 // PORT_TP
+	PORT_AUI   = 0x01 // PORT_AUI
+	PORT_MII   = 0x02 // PORT_MII
+	PORT_FIBRE = 0x03 // PORT_FIBRE
+	PORT_BNC   = 0x04 // PORT_BNC
+	PORT_DA    = 0x05 // PORT_DA
+	PORT_NONE  = 0xef // PORT_NONE
+	PORT_OTHER = 0xff // PORT_OTHER
+
+	// Autoneg settings (Manually defined based on <linux/ethtool.h>)
+	AUTONEG_DISABLE = 0x00 // AUTONEG_DISABLE
+	AUTONEG_ENABLE  = 0x01 // AUTONEG_ENABLE
+
+	// MDIX states (Manually defined based on <linux/ethtool.h>)
+	ETH_TP_MDI_INVALID = 0x00 // ETH_TP_MDI_INVALID
+	ETH_TP_MDI         = 0x01 // ETH_TP_MDI
+	ETH_TP_MDI_X       = 0x02 // ETH_TP_MDI_X
+	ETH_TP_MDI_AUTO    = 0x03 // Control value ETH_TP_MDI_AUTO
+
+	// Link mode mask bits count (Manually defined based on ethtool.h)
+	ETHTOOL_LINK_MODE_MASK_NBITS = 92 // __ETHTOOL_LINK_MODE_MASK_NBITS
+
+	// Calculate max nwords based on NBITS using the manually defined constant
+	MAX_LINK_MODE_MASK_NWORDS = (ETHTOOL_LINK_MODE_MASK_NBITS + 31) / 32 // = 3
 )
 
 // MAX_GSTRINGS maximum number of stats entries that ethtool can
@@ -1253,7 +1287,7 @@ func supportedSpeeds(mask uint64) (ret []struct {
 	speed uint64
 }) {
 	for _, mode := range supportedCapabilities {
-		if ((1 << mode.mask) & mask) != 0 {
+		if mode.speed > 0 && ((1<<mode.mask)&mask) != 0 {
 			ret = append(ret, mode)
 		}
 	}
