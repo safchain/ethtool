@@ -373,14 +373,14 @@ type TimestampingInformation struct {
 	rxReserved     [3]uint32
 }
 
-type ethtoolGStrings struct {
+type EthtoolGStrings struct {
 	cmd        uint32
 	string_set uint32
 	len        uint32
 	data       [MAX_GSTRINGS * ETH_GSTRING_LEN]byte
 }
 
-type ethtoolStats struct {
+type EthtoolStats struct {
 	cmd     uint32
 	n_stats uint32
 	data    [MAX_GSTRINGS]uint64
@@ -962,7 +962,7 @@ func (e *Ethtool) getNames(intf string, mask int) (map[string]uint, error) {
 		return nil, fmt.Errorf("ethtool currently doesn't support more than %d entries, received %d", MAX_GSTRINGS, length)
 	}
 
-	gstrings := ethtoolGStrings{
+	gstrings := EthtoolGStrings{
 		cmd:        ETHTOOL_GSTRINGS,
 		string_set: uint32(mask),
 		len:        length,
@@ -1150,7 +1150,19 @@ func (e *Ethtool) LinkState(intf string) (uint32, error) {
 }
 
 // Stats retrieves stats of the given interface name.
+// This maintains backward compatibility with existing code.
 func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
+	// Create temporary buffers and delegate to StatsWithBuffer
+	gstrings := new(EthtoolGStrings)
+	stats := new(EthtoolStats)
+
+	return e.StatsWithBuffer(intf, gstrings, stats)
+}
+
+// StatsWithBuffer retrieves stats of the given interface name using pre-allocated buffers.
+// This allows the caller to control where the large structures are allocated,
+// which can be useful to avoid heap allocations in Go 1.24+.
+func (e *Ethtool) StatsWithBuffer(intf string, gstrings *EthtoolGStrings, stats *EthtoolStats) (map[string]uint64, error) {
 	drvinfo := ethtoolDrvInfo{
 		cmd: ETHTOOL_GDRVINFO,
 	}
@@ -1163,24 +1175,18 @@ func (e *Ethtool) Stats(intf string) (map[string]uint64, error) {
 		return nil, fmt.Errorf("ethtool currently doesn't support more than %d entries, received %d", MAX_GSTRINGS, drvinfo.n_stats)
 	}
 
-	gstrings := ethtoolGStrings{
-		cmd:        ETHTOOL_GSTRINGS,
-		string_set: ETH_SS_STATS,
-		len:        drvinfo.n_stats,
-		data:       [MAX_GSTRINGS * ETH_GSTRING_LEN]byte{},
-	}
+	gstrings.cmd = ETHTOOL_GSTRINGS
+	gstrings.string_set = ETH_SS_STATS
+	gstrings.len = drvinfo.n_stats
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&gstrings))); err != nil {
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(gstrings))); err != nil {
 		return nil, err
 	}
 
-	stats := ethtoolStats{
-		cmd:     ETHTOOL_GSTATS,
-		n_stats: drvinfo.n_stats,
-		data:    [MAX_GSTRINGS]uint64{},
-	}
+	stats.cmd = ETHTOOL_GSTATS
+	stats.n_stats = drvinfo.n_stats
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&stats))); err != nil {
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(stats))); err != nil {
 		return nil, err
 	}
 
