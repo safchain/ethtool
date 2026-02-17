@@ -1,4 +1,4 @@
-//go:build linux
+//go:build !linux
 
 /*
  *
@@ -27,72 +27,14 @@
 // even the peer of a VETH interface.
 package ethtool
 
-import (
-	"unsafe"
-
-	"golang.org/x/sys/unix"
-)
-
-type ethtoolValue struct { /* ethtool.c: struct ethtool_value */
-	cmd  uint32
-	data uint32
-}
-
 // MsglvlGet returns the msglvl of the given interface.
 func (e *Ethtool) MsglvlGet(intf string) (uint32, error) {
-	edata := ethtoolValue{
-		cmd: ETHTOOL_GMSGLVL,
-	}
-
-	var name [IFNAMSIZ]byte
-	copy(name[:], []byte(intf))
-
-	ifr := ifreq{
-		ifr_name: name,
-		ifr_data: uintptr(unsafe.Pointer(&edata)),
-	}
-
-	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
-		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
-	if ep != 0 {
-		return 0, ep
-	}
-
-	return edata.data, nil
+	return 0, errOSUnsupported
 }
 
 // MsglvlSet returns the read-msglvl, post-set-msglvl of the given interface.
 func (e *Ethtool) MsglvlSet(intf string, valset uint32) (uint32, uint32, error) {
-	edata := ethtoolValue{
-		cmd: ETHTOOL_GMSGLVL,
-	}
-
-	var name [IFNAMSIZ]byte
-	copy(name[:], []byte(intf))
-
-	ifr := ifreq{
-		ifr_name: name,
-		ifr_data: uintptr(unsafe.Pointer(&edata)),
-	}
-
-	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
-		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
-	if ep != 0 {
-		return 0, 0, ep
-	}
-
-	readval := edata.data
-
-	edata.cmd = ETHTOOL_SMSGLVL
-	edata.data = valset
-
-	_, _, ep = unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
-		SIOCETHTOOL, uintptr(unsafe.Pointer(&ifr)))
-	if ep != 0 {
-		return 0, 0, ep
-	}
-
-	return readval, edata.data, nil
+	return 0, 0, errOSUnsupported
 }
 
 // MsglvlGet returns the msglvl of the given interface.

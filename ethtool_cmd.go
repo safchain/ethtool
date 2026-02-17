@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -32,28 +34,6 @@ import (
 
 	"golang.org/x/sys/unix"
 )
-
-// EthtoolCmd is the Go version of the Linux kerne ethtool_cmd struct
-// see ethtool.c
-type EthtoolCmd struct {
-	Cmd            uint32
-	Supported      uint32
-	Advertising    uint32
-	Speed          uint16
-	Duplex         uint8
-	Port           uint8
-	Phy_address    uint8
-	Transceiver    uint8
-	Autoneg        uint8
-	Mdio_support   uint8
-	Maxtxpkt       uint32
-	Maxrxpkt       uint32
-	Speed_hi       uint16
-	Eth_tp_mdix    uint8
-	Reserved2      uint8
-	Lp_advertising uint32
-	Reserved       [2]uint32
-}
 
 // CmdGet returns the interface settings in the receiver struct
 // and returns speed
