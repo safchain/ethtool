@@ -3,6 +3,7 @@ package ethtool
 import (
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"strings"
 	"syscall"
@@ -87,7 +88,7 @@ func (e *Ethtool) GetLinkSettings(intf string) (*LinkSettings, error) {
 		switch {
 		case nwords <= 0 || nwords > MAX_LINK_MODE_MASK_NWORDS:
 			// Sub-case 2a: Invalid nwords -> fallback
-			fmt.Printf("Warning: GLINKSETTINGS succeeded but returned invalid nwords (%d), attempting fallback to GSET\n", nwords)
+			log.Printf("Warning: GLINKSETTINGS succeeded but returned invalid nwords (%d), attempting fallback to GSET\n", nwords)
 			fallbackReason = "invalid nwords from GLINKSETTINGS"
 		case 3*nwords > len(req.Masks):
 			// Sub-case 2b: Buffer too small -> error
@@ -246,7 +247,7 @@ func buildLinkModeMask(modes []string, nwords int) []uint32 {
 			if wordIndex < nwords {
 				mask[wordIndex] |= 1 << bitInWord
 			} else {
-				fmt.Printf("Warning: Link mode '%s' (bit %d) exceeds device's mask size (%d words)\n", modeName, info.bitIndex, nwords)
+				log.Printf("Warning: Link mode '%s' (bit %d) exceeds device's mask size (%d words)\n", modeName, info.bitIndex, nwords)
 			}
 		} else {
 			// Check if the user provided a non-speed mode name - ignore it for the mask, maybe warn?
@@ -258,7 +259,7 @@ func buildLinkModeMask(modes []string, nwords int) []uint32 {
 				}
 			}
 			if !isKnownNonSpeed {
-				fmt.Printf("Warning: Unknown link mode '%s' specified for mask building\n", modeName)
+				log.Printf("Warning: Unknown link mode '%s' specified for mask building\n", modeName)
 			} // Silently ignore known non-speed modes like Autoneg, TP, Pause for the mask
 		}
 	}
