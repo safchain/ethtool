@@ -74,7 +74,7 @@ func (e *Ethtool) GetLinkSettings(intf string) (*LinkSettings, error) {
 	// Provide the maximum expected nwords based on our constant
 	req.Settings.LinkModeMasksNwords = int8(MAX_LINK_MODE_MASK_NWORDS)
 
-	err := e.ioctl(intf, uintptr(unsafe.Pointer(&req)))
+	err := e.ioctl(intf, unsafe.Pointer(&req))
 	fallbackReason := ""
 
 	var errno syscall.Errno
@@ -137,7 +137,7 @@ func (e *Ethtool) SetLinkSettings(intf string, settings *LinkSettings) error {
 	checkReq.Settings.Cmd = ETHTOOL_GLINKSETTINGS
 	checkReq.Settings.LinkModeMasksNwords = int8(MAX_LINK_MODE_MASK_NWORDS)
 
-	errGLinkSettings := e.ioctl(intf, uintptr(unsafe.Pointer(&checkReq)))
+	errGLinkSettings := e.ioctl(intf, unsafe.Pointer(&checkReq))
 	canUseGLinkSettings := false
 	nwords := 0
 
@@ -179,7 +179,7 @@ func (e *Ethtool) SetLinkSettings(intf string, settings *LinkSettings) error {
 		copy(setReq.Masks[0*nwords:1*nwords], zeroMaskSupported)
 		copy(setReq.Masks[2*nwords:3*nwords], zeroMaskLp)
 
-		if err := e.ioctl(intf, uintptr(unsafe.Pointer(&setReq))); err != nil {
+		if err := e.ioctl(intf, unsafe.Pointer(&setReq)); err != nil {
 			return fmt.Errorf("ETHTOOL_SLINKSETTINGS ioctl failed: %w", err)
 		}
 		return nil
