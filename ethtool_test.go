@@ -24,6 +24,7 @@ package ethtool
 import (
 	"net"
 	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -163,6 +164,67 @@ func TestFeatures(t *testing.T) {
 	if fixed == 0 {
 		// the lo interface MUST have some non-available features, by design
 		t.Fatalf("loopback interface reported all features available")
+	}
+}
+
+// This test exercises Ethtool.FeatureNames at varying stack depths. The callee stack depth
+// should not impact the correctness of the function and so we assert it is equivalent for
+// varying depths.
+// At the time of writing, Ethtool.FeatureNames used unsafe.Pointer incorrectly. A struct was created
+// and cast to uintptr before being passed to Ethtool.ioctl. A uintptr is opaque to the runtime for
+// the purposes of liveness checks and stack copying. If a uintptr argument is stored on the stack
+// and the stack is grown then it will be a dangling pointer to the old stack.
+func TestFeatureNamesStackDepth(t *testing.T) {
+	var callFeatureNamesAtDepth func(*Ethtool, string, int) (map[string]uint, error)
+	callFeatureNamesAtDepth = func(e *Ethtool, intf string, depth int) (map[string]uint, error) {
+		if depth <= 0 {
+			return e.FeatureNames(intf)
+		}
+		var pad [8]byte
+		names, err := callFeatureNamesAtDepth(e, intf, depth-1)
+		runtime.KeepAlive(&pad)
+		return names, err
+	}
+	const intf = "lo"
+
+	e, err := NewEthtool()
+	if err != nil {
+		t.Fatalf("NewEthtool failed: %v", err)
+	}
+	defer e.Close()
+
+	want, err := e.FeatureNames(intf)
+	if err != nil {
+		t.Fatalf("FeatureNames(%q) failed: %v", intf, err)
+	}
+	if len(want) == 0 {
+		t.Fatalf("FeatureNames(%q) returned no features", intf)
+	}
+
+	const maxDepth = 512
+
+	type result struct {
+		names map[string]uint
+		err   error
+	}
+
+	for depth := 0; depth <= maxDepth; depth++ {
+		ch := make(chan result, 1)
+		go func() {
+			names, err := callFeatureNamesAtDepth(e, intf, depth)
+			ch <- result{names: names, err: err}
+		}()
+		got := <-ch
+
+		if got.err != nil {
+			t.Fatalf("FeatureNames(%q) at stack depth=%d returned error: %v", intf, depth, got.err)
+		}
+		if !reflect.DeepEqual(got.names, want) {
+			t.Fatalf(
+				"FeatureNames(%q) incorrect at stack depth=%d: got %d features, want %d.",
+				intf, depth, len(got.names), len(want),
+			)
+		}
 	}
 }
 
