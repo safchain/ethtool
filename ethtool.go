@@ -162,7 +162,9 @@ var (
 
 type ifreq struct {
 	ifr_name [IFNAMSIZ]byte
-	ifr_data uintptr
+	// unsafe.Pointer is not opaque to the runtime and
+	// will be updated if the underlying object moves.
+	ifr_data unsafe.Pointer
 }
 
 // following structures comes from uapi/linux/ethtool.h
@@ -650,7 +652,7 @@ func (e *Ethtool) GetWakeOnLan(intf string) (WakeOnLan, error) {
 		Cmd: ETHTOOL_GWOL,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&wol))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&wol)); err != nil {
 		return WakeOnLan{}, err
 	}
 
@@ -662,14 +664,14 @@ func (e *Ethtool) GetWakeOnLan(intf string) (WakeOnLan, error) {
 func (e *Ethtool) SetWakeOnLan(intf string, wol WakeOnLan) (WakeOnLan, error) {
 	wol.Cmd = ETHTOOL_SWOL
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&wol))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&wol)); err != nil {
 		return WakeOnLan{}, err
 	}
 
 	return wol, nil
 }
 
-func (e *Ethtool) ioctl(intf string, data uintptr) error {
+func (e *Ethtool) ioctl(intf string, data unsafe.Pointer) error {
 	var name [IFNAMSIZ]byte
 	copy(name[:], []byte(intf))
 
@@ -691,7 +693,7 @@ func (e *Ethtool) getDriverInfo(intf string) (ethtoolDrvInfo, error) {
 		cmd: ETHTOOL_GDRVINFO,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&drvinfo))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&drvinfo)); err != nil {
 		return ethtoolDrvInfo{}, err
 	}
 
@@ -705,7 +707,7 @@ func (e *Ethtool) getIndir(intf string) (Indir, error) {
 		Size: 0,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&indir_head))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&indir_head)); err != nil {
 		return Indir{}, err
 	}
 
@@ -714,7 +716,7 @@ func (e *Ethtool) getIndir(intf string) (Indir, error) {
 		Size: indir_head.Size,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&indir))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&indir)); err != nil {
 		return Indir{}, err
 	}
 
@@ -735,7 +737,7 @@ func (e *Ethtool) setIndir(intf string, indir Indir, setIndir SetIndir) (Indir, 
 	}
 
 	indir.Cmd = ETHTOOL_SRXFHINDIR
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&indir))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&indir)); err != nil {
 		return Indir{}, err
 	}
 
@@ -789,7 +791,7 @@ func (e *Ethtool) getChannels(intf string) (Channels, error) {
 		Cmd: ETHTOOL_GCHANNELS,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&channels))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&channels)); err != nil {
 		return Channels{}, err
 	}
 
@@ -799,7 +801,7 @@ func (e *Ethtool) getChannels(intf string) (Channels, error) {
 func (e *Ethtool) setChannels(intf string, channels Channels) (Channels, error) {
 	channels.Cmd = ETHTOOL_SCHANNELS
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&channels))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&channels)); err != nil {
 		return Channels{}, err
 	}
 
@@ -811,7 +813,7 @@ func (e *Ethtool) getCoalesce(intf string) (Coalesce, error) {
 		Cmd: ETHTOOL_GCOALESCE,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&coalesce))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&coalesce)); err != nil {
 		return Coalesce{}, err
 	}
 
@@ -821,7 +823,7 @@ func (e *Ethtool) getCoalesce(intf string) (Coalesce, error) {
 func (e *Ethtool) setCoalesce(intf string, coalesce Coalesce) (Coalesce, error) {
 	coalesce.Cmd = ETHTOOL_SCOALESCE
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&coalesce))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&coalesce)); err != nil {
 		return Coalesce{}, err
 	}
 
@@ -833,7 +835,7 @@ func (e *Ethtool) getTimestampingInformation(intf string) (TimestampingInformati
 		Cmd: ETHTOOL_GET_TS_INFO,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&ts))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&ts)); err != nil {
 		return TimestampingInformation{}, err
 	}
 
@@ -846,7 +848,7 @@ func (e *Ethtool) getPermAddr(intf string) (ethtoolPermAddr, error) {
 		size: PERMADDR_LEN,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&permAddr))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&permAddr)); err != nil {
 		return ethtoolPermAddr{}, err
 	}
 
@@ -858,7 +860,7 @@ func (e *Ethtool) getModuleEeprom(intf string) (ethtoolEeprom, ethtoolModInfo, e
 		cmd: ETHTOOL_GMODULEINFO,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&modInfo))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&modInfo)); err != nil {
 		return ethtoolEeprom{}, ethtoolModInfo{}, err
 	}
 
@@ -872,7 +874,7 @@ func (e *Ethtool) getModuleEeprom(intf string) (ethtoolEeprom, ethtoolModInfo, e
 		return ethtoolEeprom{}, ethtoolModInfo{}, fmt.Errorf("eeprom size: %d is larger than buffer size: %d", modInfo.eeprom_len, EEPROM_LEN)
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&eeprom))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&eeprom)); err != nil {
 		return ethtoolEeprom{}, ethtoolModInfo{}, err
 	}
 
@@ -885,7 +887,7 @@ func (e *Ethtool) GetRing(intf string) (Ring, error) {
 		Cmd: ETHTOOL_GRINGPARAM,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&ring))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&ring)); err != nil {
 		return Ring{}, err
 	}
 
@@ -896,7 +898,7 @@ func (e *Ethtool) GetRing(intf string) (Ring, error) {
 func (e *Ethtool) SetRing(intf string, ring Ring) (Ring, error) {
 	ring.Cmd = ETHTOOL_SRINGPARAM
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&ring))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&ring)); err != nil {
 		return Ring{}, err
 	}
 
@@ -909,7 +911,7 @@ func (e *Ethtool) GetPause(intf string) (Pause, error) {
 		Cmd: ETHTOOL_GPAUSEPARAM,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&pause))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&pause)); err != nil {
 		return Pause{}, err
 	}
 
@@ -920,7 +922,7 @@ func (e *Ethtool) GetPause(intf string) (Pause, error) {
 func (e *Ethtool) SetPause(intf string, pause Pause) (Pause, error) {
 	pause.Cmd = ETHTOOL_SPAUSEPARAM
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&pause))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&pause)); err != nil {
 		return Pause{}, err
 	}
 
@@ -967,7 +969,7 @@ func (e *Ethtool) getNames(intf string, mask int) (map[string]uint, error) {
 		data:      [MAX_SSET_INFO]uint32{},
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&ssetInfo))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&ssetInfo)); err != nil {
 		return nil, err
 	}
 
@@ -986,7 +988,7 @@ func (e *Ethtool) getNames(intf string, mask int) (map[string]uint, error) {
 		data:       [MAX_GSTRINGS * ETH_GSTRING_LEN]byte{},
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&gstrings))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&gstrings)); err != nil {
 		return nil, err
 	}
 
@@ -1024,7 +1026,7 @@ func (e *Ethtool) Features(intf string) (map[string]bool, error) {
 		size: (length + 32 - 1) / 32,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&features))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&features)); err != nil {
 		return nil, err
 	}
 
@@ -1054,7 +1056,7 @@ func (e *Ethtool) FeaturesWithState(intf string) (map[string]FeatureState, error
 		size: (length + 32 - 1) / 32,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&features))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&features)); err != nil {
 		return nil, err
 	}
 
@@ -1088,7 +1090,7 @@ func (e *Ethtool) Change(intf string, config map[string]bool) error {
 		}
 	}
 
-	return e.ioctl(intf, uintptr(unsafe.Pointer(&features)))
+	return e.ioctl(intf, unsafe.Pointer(&features))
 }
 
 // PrivFlagsNames shows supported private flags by their name.
@@ -1110,7 +1112,7 @@ func (e *Ethtool) PrivFlags(intf string) (map[string]bool, error) {
 
 	var val ethtoolLink
 	val.cmd = ETHTOOL_GPFLAGS
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&val))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&val)); err != nil {
 		return nil, err
 	}
 
@@ -1131,7 +1133,7 @@ func (e *Ethtool) UpdatePrivFlags(intf string, config map[string]bool) error {
 
 	var curr ethtoolLink
 	curr.cmd = ETHTOOL_GPFLAGS
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&curr))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&curr)); err != nil {
 		return err
 	}
 
@@ -1150,7 +1152,7 @@ func (e *Ethtool) UpdatePrivFlags(intf string, config map[string]bool) error {
 		}
 	}
 
-	return e.ioctl(intf, uintptr(unsafe.Pointer(&update)))
+	return e.ioctl(intf, unsafe.Pointer(&update))
 }
 
 // LinkState get the state of a link.
@@ -1159,7 +1161,7 @@ func (e *Ethtool) LinkState(intf string) (uint32, error) {
 		cmd: ETHTOOL_GLINK,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&x))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&x)); err != nil {
 		return 0, err
 	}
 
@@ -1188,7 +1190,7 @@ func (e *Ethtool) StatsWithBuffer(intf string, gstringsPtr *EthtoolGStrings, sta
 		cmd: ETHTOOL_GDRVINFO,
 	}
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&drvinfo))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(&drvinfo)); err != nil {
 		return nil, err
 	}
 
@@ -1200,14 +1202,14 @@ func (e *Ethtool) StatsWithBuffer(intf string, gstringsPtr *EthtoolGStrings, sta
 	gstringsPtr.string_set = ETH_SS_STATS
 	gstringsPtr.len = drvinfo.n_stats
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(gstringsPtr))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(gstringsPtr)); err != nil {
 		return nil, err
 	}
 
 	statsPtr.cmd = ETHTOOL_GSTATS
 	statsPtr.n_stats = drvinfo.n_stats
 
-	if err := e.ioctl(intf, uintptr(unsafe.Pointer(statsPtr))); err != nil {
+	if err := e.ioctl(intf, unsafe.Pointer(statsPtr)); err != nil {
 		return nil, err
 	}
 
@@ -1245,7 +1247,7 @@ func (e *Ethtool) Identity(intf string, duration *time.Duration) error {
 
 func (e *Ethtool) identity(intf string, identity IdentityConf) error {
 	identity.Cmd = ETHTOOL_PHYS_ID
-	return e.ioctl(intf, uintptr(unsafe.Pointer(&identity)))
+	return e.ioctl(intf, unsafe.Pointer(&identity))
 }
 
 // NewEthtool returns a new ethtool handler

@@ -47,7 +47,7 @@ func (e *Ethtool) MsglvlGet(intf string) (uint32, error) {
 
 	ifr := ifreq{
 		ifr_name: name,
-		ifr_data: uintptr(unsafe.Pointer(&edata)),
+		ifr_data: unsafe.Pointer(&edata),
 	}
 
 	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
@@ -70,7 +70,7 @@ func (e *Ethtool) MsglvlSet(intf string, valset uint32) (uint32, uint32, error) 
 
 	ifr := ifreq{
 		ifr_name: name,
-		ifr_data: uintptr(unsafe.Pointer(&edata)),
+		ifr_data: unsafe.Pointer(&edata),
 	}
 
 	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),

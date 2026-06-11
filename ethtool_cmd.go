@@ -114,7 +114,7 @@ func (e *Ethtool) CmdGet(ecmd *EthtoolCmd, intf string) (uint32, error) {
 
 	ifr := ifreq{
 		ifr_name: name,
-		ifr_data: uintptr(unsafe.Pointer(ecmd)),
+		ifr_data: unsafe.Pointer(ecmd),
 	}
 
 	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
@@ -142,7 +142,7 @@ func (e *Ethtool) CmdSet(ecmd *EthtoolCmd, intf string) (uint32, error) {
 
 	ifr := ifreq{
 		ifr_name: name,
-		ifr_data: uintptr(unsafe.Pointer(ecmd)),
+		ifr_data: unsafe.Pointer(ecmd),
 	}
 
 	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
@@ -171,7 +171,7 @@ func (e *Ethtool) CmdGetMapped(intf string) (map[string]uint64, error) {
 
 	ifr := ifreq{
 		ifr_name: name,
-		ifr_data: uintptr(unsafe.Pointer(&ecmd)),
+		ifr_data: unsafe.Pointer(&ecmd),
 	}
 
 	_, _, ep := unix.Syscall(unix.SYS_IOCTL, uintptr(e.fd),
